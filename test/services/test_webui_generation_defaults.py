@@ -391,6 +391,7 @@ def test_loomloom_tuning_survives_restart_without_persisting_payment_state():
     """Paid-provider tuning is reusable; quotes and confirmations are not."""
     test_app_config = dict(
         config.app,
+        production_intelligence="legacy",
         video_source="loomloom",
         script_generation_backend="loomloom",
         loomloom_api_token="",

@@ -41,6 +41,13 @@ Live provider tests are skipped by default. To run tests that may call external
 TTS or LLM services, set `MPT_RUN_INTEGRATION_TESTS=1` and provide the required
 provider credentials.
 
+Codex unit tests mock the SDK and require no ChatGPT account. The separate
+`uv run python -m app.intelligence.smoke --offline` command renders tiny local
+videos through both production modes without any external AI calls. To explicitly
+verify the real subscription SDK, structured JSON and local image input after
+sign-in, run `uv run python -m app.intelligence.smoke --live`. See the
+[production intelligence guide](../docs/codex-production-intelligence.md).
+
 ## Adding New Tests
 
 To add tests for other components, follow these guidelines:

@@ -402,6 +402,23 @@ div[class*="st-key-task_row_"] button[kind="secondary"] p {
 
 /* 移动端隐藏桌面表头，并将任务行重排为“主题 + 元信息 + 操作”紧凑结构。 */
 @media (max-width: 700px) {
+    div[class*="st-key-main_settings_grid"]
+        > div[data-testid="stLayoutWrapper"]
+        > div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 1rem !important;
+    }
+
+    div[class*="st-key-main_settings_grid"]
+        > div[data-testid="stLayoutWrapper"]
+        > div[data-testid="stHorizontalBlock"]
+        > div[data-testid="stColumn"] {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
     div[class*="st-key-task_table_header_"] {
         display: none !important;
     }

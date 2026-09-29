@@ -1,0 +1,519 @@
+{
+  "scope": "Ordinary public website responses; content bodies are not reproduced in this deliverable. Hashes describe captured bytes, not independent proof of ownership.",
+  "responses": [
+    {
+      "requested_url": "https://fgmediacorp.com/",
+      "captured_at_utc": "2026-09-10T16:16:28.877296+00:00",
+      "status": 520,
+      "final_url": "https://fgmediacorp.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "3754b47ba59d4346f7b56f182e962524c2a8cd98f3c2ce264d147fff070e1fd4",
+      "bytes": 7373
+    },
+    {
+      "requested_url": "https://fgmediacorp.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:28.877771+00:00",
+      "status": 520,
+      "final_url": "https://fgmediacorp.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "36b24838d2c20ae40589af9af057f3c18cebf7d00943832a788347d50ac15fe5",
+      "bytes": 7372
+    },
+    {
+      "requested_url": "https://fgmediacorp.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:28.877969+00:00",
+      "status": 200,
+      "final_url": "https://fgmediacorp.com/robots.txt",
+      "bytes": 1836,
+      "sha256": "842b34303164ead41bccb7c05d1707422e98d108753b397b6dcc19683eb02101"
+    },
+    {
+      "requested_url": "https://autulu.com/",
+      "captured_at_utc": "2026-09-10T16:16:29.308757+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://autulu.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.339005+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://autulu.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.454444+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://btuatu.com/",
+      "captured_at_utc": "2026-09-10T16:16:29.454551+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://btuatu.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.454647+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://btuatu.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.505161+00:00",
+      "error": "<urlopen error [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://longbientruck.com/",
+      "captured_at_utc": "2026-09-10T16:16:29.572463+00:00",
+      "status": 200,
+      "final_url": "https://longbientruck.com/",
+      "bytes": 235661,
+      "sha256": "5abad2155a7ff586d62d97fc8972f50996d95bd10331399f9395566ef4d552bb"
+    },
+    {
+      "requested_url": "https://longbientruck.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.596046+00:00",
+      "status": 200,
+      "final_url": "https://longbientruck.com/ads.txt",
+      "bytes": 26971,
+      "sha256": "9f0ddb0313b0632d13ae16d26f4f94117ebb9f5a7099aa9167ae356398150cf0"
+    },
+    {
+      "requested_url": "https://longbientruck.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.611173+00:00",
+      "status": 200,
+      "final_url": "https://longbientruck.com/robots.txt",
+      "bytes": 1860,
+      "sha256": "b2c4d814f3557cf756f1d6824a5f93786d7b531936a56cafe1afad9501b6c15c"
+    },
+    {
+      "requested_url": "https://tinfilmus.com/",
+      "captured_at_utc": "2026-09-10T16:16:29.957978+00:00",
+      "status": 520,
+      "final_url": "https://tinfilmus.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "b4a7345cedcd7d5640f6c93a5d91570a3b4aa438d76c77acf918b8797ca6665b",
+      "bytes": 7360
+    },
+    {
+      "requested_url": "https://tinfilmus.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:29.973552+00:00",
+      "status": 520,
+      "final_url": "https://tinfilmus.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "09b6fc1cf7b50b091709234c64f99c2c845689a8672edaf8244b93c494deb990",
+      "bytes": 7360
+    },
+    {
+      "requested_url": "https://tinfilmus.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:30.309678+00:00",
+      "status": 200,
+      "final_url": "https://tinfilmus.com/robots.txt",
+      "bytes": 24,
+      "sha256": "7bb0414a00c2d5697aa8f3485d1d926b1e17f7b4d5c87e173647a3d49ea872cb"
+    },
+    {
+      "requested_url": "https://publicedgenews.com/",
+      "captured_at_utc": "2026-09-10T16:16:30.561682+00:00",
+      "status": 520,
+      "final_url": "https://publicedgenews.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "c3ada1f1ebabbd7337de738878affd8964c44a9de7deca2ed6b908b1f08d9e32",
+      "bytes": 7391
+    },
+    {
+      "requested_url": "https://publicedgenews.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:30.772622+00:00",
+      "status": 520,
+      "final_url": "https://publicedgenews.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "3ba5065ce742f4b43a22d110f5ca38c221b41b0c446410eae0b9c4862b486cfe",
+      "bytes": 7390
+    },
+    {
+      "requested_url": "https://publicedgenews.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:30.944138+00:00",
+      "status": 200,
+      "final_url": "https://publicedgenews.com/robots.txt",
+      "bytes": 1860,
+      "sha256": "b2c4d814f3557cf756f1d6824a5f93786d7b531936a56cafe1afad9501b6c15c"
+    },
+    {
+      "requested_url": "https://news24orbit.com/",
+      "captured_at_utc": "2026-09-10T16:16:31.127096+00:00",
+      "status": 520,
+      "final_url": "https://news24orbit.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "51081e1163f171d596e10ab56bb8c97d1cee78162373f1de6feabbe4afe77614",
+      "bytes": 7373
+    },
+    {
+      "requested_url": "https://news24orbit.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.297048+00:00",
+      "status": 520,
+      "final_url": "https://news24orbit.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "0fd545adb468a726a4fadfa2cdb67efbedd838cdc6aebd9d5ad58e6ff9e8d370",
+      "bytes": 7373
+    },
+    {
+      "requested_url": "https://news24orbit.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.297297+00:00",
+      "status": 200,
+      "final_url": "https://news24orbit.com/robots.txt",
+      "bytes": 24,
+      "sha256": "7bb0414a00c2d5697aa8f3485d1d926b1e17f7b4d5c87e173647a3d49ea872cb"
+    },
+    {
+      "requested_url": "https://dailytin24.com/",
+      "captured_at_utc": "2026-09-10T16:16:31.528745+00:00",
+      "status": 520,
+      "final_url": "https://dailytin24.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "a2e83b8fc5c11a93528ce0bd8a95316c7f499a0d9392dd092b2f5f8eb1168f7b",
+      "bytes": 7367
+    },
+    {
+      "requested_url": "https://dailytin24.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.566638+00:00",
+      "status": 520,
+      "final_url": "https://dailytin24.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "ba1ccaf1587c94729b5ae0182d46c9eee5620201357212f93755b7d81569c09d",
+      "bytes": 7367
+    },
+    {
+      "requested_url": "https://dailytin24.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.594289+00:00",
+      "status": 200,
+      "final_url": "https://dailytin24.com/robots.txt",
+      "bytes": 24,
+      "sha256": "7bb0414a00c2d5697aa8f3485d1d926b1e17f7b4d5c87e173647a3d49ea872cb"
+    },
+    {
+      "requested_url": "https://newstvseries.com/",
+      "captured_at_utc": "2026-09-10T16:16:31.884135+00:00",
+      "status": 520,
+      "final_url": "https://newstvseries.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "c44b26cd94938167627edfba1e739a1586ca53ed1540e58001de4bba8366a2e5",
+      "bytes": 7379
+    },
+    {
+      "requested_url": "https://newstvseries.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.884354+00:00",
+      "status": 520,
+      "final_url": "https://newstvseries.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "939a86c88f75f707129c4a0a279a0a05a0b4f7b400ca9197c72eeaa55f2acf9c",
+      "bytes": 7379
+    },
+    {
+      "requested_url": "https://newstvseries.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:31.884550+00:00",
+      "status": 200,
+      "final_url": "https://newstvseries.com/robots.txt",
+      "bytes": 24,
+      "sha256": "7bb0414a00c2d5697aa8f3485d1d926b1e17f7b4d5c87e173647a3d49ea872cb"
+    },
+    {
+      "requested_url": "https://todaycnews.com/",
+      "captured_at_utc": "2026-09-10T16:16:32.250710+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://todaycnews.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:32.256188+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://todaycnews.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:32.346476+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://fnnewsupdate.com/",
+      "captured_at_utc": "2026-09-10T16:16:32.559524+00:00",
+      "status": 520,
+      "final_url": "https://fnnewsupdate.com/",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "49842e8a0507b472749a6dbedf870d9727f91202f8790caa178d995e709ac26c",
+      "bytes": 7378
+    },
+    {
+      "requested_url": "https://fnnewsupdate.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:32.559751+00:00",
+      "status": 520,
+      "final_url": "https://fnnewsupdate.com/ads.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "2c0c35523c2a2c9a3ad933b61ca9f9d83e715ae40ff3e58b940e0b9d8350e572",
+      "bytes": 7379
+    },
+    {
+      "requested_url": "https://fnnewsupdate.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:32.565518+00:00",
+      "status": 520,
+      "final_url": "https://fnnewsupdate.com/robots.txt",
+      "error": "HTTP Error 520: <none>",
+      "sha256": "37f15af2563b58682d9fa1600fc68f63694faa77e6ac8114e37e5b78e21c4ed7",
+      "bytes": 7379
+    },
+    {
+      "requested_url": "https://usceleb247.com/",
+      "captured_at_utc": "2026-09-10T16:16:32.938746+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/",
+      "bytes": 42872,
+      "sha256": "26ae154ef7d7ebc43cd0493ab0df8959c6ed6434e767b72ceb4940853755294c"
+    },
+    {
+      "requested_url": "https://usceleb247.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:32.998037+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/ads.txt",
+      "bytes": 60996,
+      "sha256": "3bbac1aa2709019984373bb1724cca3172f8a6b78e28a2b74aed1d741db8117f"
+    },
+    {
+      "requested_url": "https://usceleb247.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.044741+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/robots.txt",
+      "bytes": 115,
+      "sha256": "55d6d83274e8309c702a35d1975bb462d833a52c923bc17196285e4ac6fd954a"
+    },
+    {
+      "requested_url": "https://suamaytinhthanhtin.com/",
+      "captured_at_utc": "2026-09-10T16:16:33.394606+00:00",
+      "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "requested_url": "https://suamaytinhthanhtin.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.404094+00:00",
+      "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "requested_url": "https://suamaytinhthanhtin.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.405026+00:00",
+      "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/",
+      "captured_at_utc": "2026-09-10T16:16:33.436991+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/",
+      "bytes": 48530,
+      "sha256": "2d008f3706bcf1e3fbe4c3dedae133dc856b3f1439ea94e72879b6e28140d471"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.437093+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/ads.txt",
+      "bytes": 62749,
+      "sha256": "d2ae0b4d72b134e6baef24292863e6c71dd11953bef2e031b687dde91b34d425"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.437220+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/robots.txt",
+      "bytes": 25,
+      "sha256": "bfa2deec44fe26a7423c5205e52918755ba9f533c2959b9e1def515dc07d7de4"
+    },
+    {
+      "requested_url": "https://quorradaily.com/",
+      "captured_at_utc": "2026-09-10T16:16:33.918280+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://quorradaily.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.921389+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://quorradaily.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:16:33.921960+00:00",
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1082)>"
+    },
+    {
+      "requested_url": "https://usceleb247.com/about/",
+      "captured_at_utc": "2026-09-10T16:17:55.544542+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/about/",
+      "bytes": 38370,
+      "sha256": "5a9d1b0728c078f80747c25f1f99e1001d11154e5286a60024554df53789d3a1"
+    },
+    {
+      "requested_url": "https://usceleb247.com/privacy-policy/",
+      "captured_at_utc": "2026-09-10T16:17:55.545067+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/privacy-policy/",
+      "bytes": 44623,
+      "sha256": "070392a552752d1f9ac8620b2ce1bc3c5a55a5f04e759fe6e3abcf3993768590"
+    },
+    {
+      "requested_url": "https://usceleb247.com/feed/",
+      "captured_at_utc": "2026-09-10T16:17:55.545224+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/feed/",
+      "bytes": 811,
+      "sha256": "76b578967eda9fdba6b5bce8729fe4effd7254689fbe4fa765446f332c13a32c"
+    },
+    {
+      "requested_url": "https://usceleb247.com/wp-sitemap.xml",
+      "captured_at_utc": "2026-09-10T16:17:56.236964+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/wp-sitemap.xml",
+      "bytes": 377,
+      "sha256": "d4a953eec21c643292880fba9d7e15830c5c9b547a10d35b751a118fb0d625fe"
+    },
+    {
+      "requested_url": "https://usceleb247.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "captured_at_utc": "2026-09-10T16:17:56.278681+00:00",
+      "status": 200,
+      "final_url": "https://usceleb247.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "bytes": 761,
+      "sha256": "74ada7dcca63a0905a6053fbb1e3ce1391f0ffba47260dc0240cbb2a62f3b161"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/about/",
+      "captured_at_utc": "2026-09-10T16:17:56.286184+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/about/",
+      "bytes": 46216,
+      "sha256": "ac118f2f01b8f46d055168a44d95ce25262dadcc998f54e469734a53b40ed96e"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/privacy-policy/",
+      "captured_at_utc": "2026-09-10T16:17:56.600885+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/privacy-policy/",
+      "bytes": 51392,
+      "sha256": "5e944c54a8de0dd178d0835d2b80751b77a6bd3349b1e8b36bbe08fef19c198d"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/feed/",
+      "captured_at_utc": "2026-09-10T16:17:56.754284+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/feed/",
+      "bytes": 835,
+      "sha256": "20574cb4b8584970c82fac0768cb737f300fe28d07011695bacb7e9f27e9e521"
+    },
+    {
+      "requested_url": "https://noithatnhaxinhbacgiang.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "captured_at_utc": "2026-09-10T16:17:56.782859+00:00",
+      "status": 200,
+      "final_url": "https://noithatnhaxinhbacgiang.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "bytes": 761,
+      "sha256": "74ada7dcca63a0905a6053fbb1e3ce1391f0ffba47260dc0240cbb2a62f3b161"
+    },
+    {
+      "requested_url": "https://longbientruck.com/gioi-thieu",
+      "captured_at_utc": "2026-09-10T16:17:57.126819+00:00",
+      "status": 200,
+      "final_url": "https://longbientruck.com/gioi-thieu",
+      "bytes": 103704,
+      "sha256": "d79591af69e2d6a81d5ad14e287cdff4be22696de3012055b7cbc62e4ef612cc"
+    },
+    {
+      "requested_url": "https://longbientruck.com/lien-he",
+      "captured_at_utc": "2026-09-10T16:17:57.171994+00:00",
+      "status": 200,
+      "final_url": "https://longbientruck.com/lien-he",
+      "bytes": 101317,
+      "sha256": "6c863394cc44f7df5b1fef0839b9cba0240980a34f6d87d538d3c82b2595c030"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/",
+      "captured_at_utc": "2026-09-10T16:18:12.737218+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/",
+      "bytes": 164111,
+      "sha256": "87289dc6e9a6de0a1390885486d1a44dbdd742d95489dd995779c82d79dc78ce"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:18:12.737689+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/ads.txt",
+      "bytes": 50174,
+      "sha256": "118d7d9b5b4111a396f62de215ca2806c3f13b97fffd24d545ceb75529871610"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:18:12.737984+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/robots.txt",
+      "bytes": 1960,
+      "sha256": "02a7ff85629963c849850f2ce0430f45f85e2185f9ec839a525240bb1982cfdc"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/",
+      "captured_at_utc": "2026-09-10T16:18:13.107720+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/",
+      "bytes": 163969,
+      "sha256": "ac94854992ee1ad68304435d57446281136f7b969be8eb28720f54386efcac89"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/ads.txt",
+      "captured_at_utc": "2026-09-10T16:18:13.245605+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/ads.txt",
+      "bytes": 60996,
+      "sha256": "3bbac1aa2709019984373bb1724cca3172f8a6b78e28a2b74aed1d741db8117f"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/robots.txt",
+      "captured_at_utc": "2026-09-10T16:18:13.367598+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/robots.txt",
+      "bytes": 1959,
+      "sha256": "6986eced5eb4c2a624b8e686847c8853e66e3913639f66885df15fea2779f6a9"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/htvc17/on-our-wedding-night-my-husband-walked-away-to-reconnect-with-his-first-love-so-before-the-sun-came-up-i-quietly-packed-my-things-left-without-a-scene-and-by-the-time-he-finally-returned-there-w/",
+      "captured_at_utc": "2026-09-10T16:19:12.228853+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/htvc17/on-our-wedding-night-my-husband-walked-away-to-reconnect-with-his-first-love-so-before-the-sun-came-up-i-quietly-packed-my-things-left-without-a-scene-and-by-the-time-he-finally-returned-there-w/",
+      "bytes": 213412,
+      "sha256": "bc4d9e1490a8d183eb5f679581636fab960dc28dca4895cca6460b4c9677b754"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/about/",
+      "captured_at_utc": "2026-09-10T16:19:12.229381+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/about/",
+      "bytes": 112074,
+      "sha256": "2f2fbc6307cfedfce3176b8fe89cc6ed581f06e3e5262a423cb01558ac9bc767"
+    },
+    {
+      "requested_url": "https://us115.longbientruck.com/wp-sitemap.xml",
+      "captured_at_utc": "2026-09-10T16:19:12.229524+00:00",
+      "status": 200,
+      "final_url": "https://us115.longbientruck.com/wp-sitemap.xml",
+      "bytes": 577,
+      "sha256": "8aa44f930c9cce8ad4ae3ccc89bcc0b254004a40298ac2c682da6a154f704334"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/htvc04/we-were-checking-in-for-a-white-house-ceremony-when-my-husband-leaned-toward-me-and-whispered-dont-embarrass-me-so-i-said-nothing-and-simply-handed-the-hostess-my-invitati/",
+      "captured_at_utc": "2026-09-10T16:19:12.949170+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/htvc04/we-were-checking-in-for-a-white-house-ceremony-when-my-husband-leaned-toward-me-and-whispered-dont-embarrass-me-so-i-said-nothing-and-simply-handed-the-hostess-my-invitati/",
+      "bytes": 217875,
+      "sha256": "83a51e5102a394d84a06626d1e4714523d8accfe3d4e376e8517e03042193865"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/about/",
+      "captured_at_utc": "2026-09-10T16:19:13.037634+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/about/",
+      "bytes": 112044,
+      "sha256": "26944b9d283d3a129ed0818beca7fe861c9d39395c33ac724e7d1b40537a7ec6"
+    },
+    {
+      "requested_url": "https://us23.longbientruck.com/wp-sitemap.xml",
+      "captured_at_utc": "2026-09-10T16:19:13.154322+00:00",
+      "status": 200,
+      "final_url": "https://us23.longbientruck.com/wp-sitemap.xml",
+      "bytes": 572,
+      "sha256": "607efc1c3a65f58431b360c620cc9293b7f294ae6cd46fe4b3ac96c6ef300196"
+    }
+  ]
+}

@@ -1,0 +1,237 @@
+{
+  "scope": "Identifiers extracted from served HTML, not executed advertising. Branding is self-description; shared identifiers establish configuration links, not beneficial ownership or revenue.",
+  "observations": [
+    {
+      "url": "https://usceleb247.com/",
+      "captured_at_utc": "2026-09-10T16:16:32.938746+00:00",
+      "sha256": "26ae154ef7d7ebc43cd0493ab0df8959c6ed6434e767b72ceb4940853755294c",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://noithatnhaxinhbacgiang.com/",
+      "captured_at_utc": "2026-09-10T16:16:33.436991+00:00",
+      "sha256": "2d008f3706bcf1e3fbe4c3dedae133dc856b3f1439ea94e72879b6e28140d471",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [],
+      "google_analytics_ids": [
+        "G-36V38ZXPV9"
+      ],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://usceleb247.com/about/",
+      "captured_at_utc": "2026-09-10T16:17:55.544542+00:00",
+      "sha256": "5a9d1b0728c078f80747c25f1f99e1001d11154e5286a60024554df53789d3a1",
+      "htv_brand_phrase_present": true,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://usceleb247.com/privacy-policy/",
+      "captured_at_utc": "2026-09-10T16:17:55.545067+00:00",
+      "sha256": "070392a552752d1f9ac8620b2ce1bc3c5a55a5f04e759fe6e3abcf3993768590",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://usceleb247.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "captured_at_utc": "2026-09-10T16:17:56.278681+00:00",
+      "sha256": "74ada7dcca63a0905a6053fbb1e3ce1391f0ffba47260dc0240cbb2a62f3b161",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [],
+      "google_analytics_ids": [],
+      "ad_slot_ids": [],
+      "theme_names": []
+    },
+    {
+      "url": "https://noithatnhaxinhbacgiang.com/about/",
+      "captured_at_utc": "2026-09-10T16:17:56.286184+00:00",
+      "sha256": "ac118f2f01b8f46d055168a44d95ce25262dadcc998f54e469734a53b40ed96e",
+      "htv_brand_phrase_present": true,
+      "adsense_publisher_ids": [],
+      "google_analytics_ids": [
+        "G-36V38ZXPV9"
+      ],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://noithatnhaxinhbacgiang.com/privacy-policy/",
+      "captured_at_utc": "2026-09-10T16:17:56.600885+00:00",
+      "sha256": "5e944c54a8de0dd178d0835d2b80751b77a6bd3349b1e8b36bbe08fef19c198d",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [],
+      "google_analytics_ids": [
+        "G-36V38ZXPV9"
+      ],
+      "ad_slot_ids": [],
+      "theme_names": [
+        "tan"
+      ]
+    },
+    {
+      "url": "https://noithatnhaxinhbacgiang.com/wp-content/themes/tan/style.css?ver=1.0.1",
+      "captured_at_utc": "2026-09-10T16:17:56.782859+00:00",
+      "sha256": "74ada7dcca63a0905a6053fbb1e3ce1391f0ffba47260dc0240cbb2a62f3b161",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [],
+      "google_analytics_ids": [],
+      "ad_slot_ids": [],
+      "theme_names": []
+    },
+    {
+      "url": "https://us115.longbientruck.com/",
+      "captured_at_utc": "2026-09-10T16:18:12.737218+00:00",
+      "sha256": "87289dc6e9a6de0a1390885486d1a44dbdd742d95489dd995779c82d79dc78ce",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5"
+      ],
+      "ad_slot_ids": [
+        "6949290025"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    },
+    {
+      "url": "https://us23.longbientruck.com/",
+      "captured_at_utc": "2026-09-10T16:18:13.107720+00:00",
+      "sha256": "ac94854992ee1ad68304435d57446281136f7b969be8eb28720f54386efcac89",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5"
+      ],
+      "ad_slot_ids": [
+        "6949290025"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    },
+    {
+      "url": "https://us115.longbientruck.com/htvc17/on-our-wedding-night-my-husband-walked-away-to-reconnect-with-his-first-love-so-before-the-sun-came-up-i-quietly-packed-my-things-left-without-a-scene-and-by-the-time-he-finally-returned-there-w/",
+      "captured_at_utc": "2026-09-10T16:19:12.228853+00:00",
+      "sha256": "bc4d9e1490a8d183eb5f679581636fab960dc28dca4895cca6460b4c9677b754",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5",
+        "G-P8VCT48VG1"
+      ],
+      "ad_slot_ids": [
+        "1289769237",
+        "1325124337",
+        "3236124349",
+        "4678349908",
+        "5372180558",
+        "6949290025",
+        "8549100120",
+        "8809074711",
+        "9311425566"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    },
+    {
+      "url": "https://us115.longbientruck.com/about/",
+      "captured_at_utc": "2026-09-10T16:19:12.229381+00:00",
+      "sha256": "2f2fbc6307cfedfce3176b8fe89cc6ed581f06e3e5262a423cb01558ac9bc767",
+      "htv_brand_phrase_present": true,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5"
+      ],
+      "ad_slot_ids": [
+        "5372180558",
+        "6949290025"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    },
+    {
+      "url": "https://us23.longbientruck.com/htvc04/we-were-checking-in-for-a-white-house-ceremony-when-my-husband-leaned-toward-me-and-whispered-dont-embarrass-me-so-i-said-nothing-and-simply-handed-the-hostess-my-invitati/",
+      "captured_at_utc": "2026-09-10T16:19:12.949170+00:00",
+      "sha256": "83a51e5102a394d84a06626d1e4714523d8accfe3d4e376e8517e03042193865",
+      "htv_brand_phrase_present": false,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5",
+        "G-HHET47YYPJ"
+      ],
+      "ad_slot_ids": [
+        "1289769237",
+        "1325124337",
+        "3236124349",
+        "4678349908",
+        "5372180558",
+        "6949290025",
+        "8549100120",
+        "8809074711",
+        "9311425566"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    },
+    {
+      "url": "https://us23.longbientruck.com/about/",
+      "captured_at_utc": "2026-09-10T16:19:13.037634+00:00",
+      "sha256": "26944b9d283d3a129ed0818beca7fe861c9d39395c33ac724e7d1b40537a7ec6",
+      "htv_brand_phrase_present": true,
+      "adsense_publisher_ids": [
+        "ca-pub-3619133031508264"
+      ],
+      "google_analytics_ids": [
+        "G-DK3E0S4HZ5"
+      ],
+      "ad_slot_ids": [
+        "5372180558",
+        "6949290025"
+      ],
+      "theme_names": [
+        "modern-news-theme"
+      ]
+    }
+  ]
+}

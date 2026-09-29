@@ -13,7 +13,7 @@ WEBUI_MAIN = ROOT_DIR / "webui" / "Main.py"
 I18N_DIR = ROOT_DIR / "webui" / "i18n"
 LLM_PROVIDER_TIPS_PREFIX = "llm_provider_tips."
 TTS_PROVIDER_TIPS_PREFIX = "tts_provider_tips."
-SECONDARY_LOCALES = ("de", "es", "fr", "id", "it", "ko", "pt", "ru", "tr", "vi")
+SECONDARY_LOCALES = ("az", "de", "es", "fr", "id", "it", "ko", "pt", "ru", "tr", "vi")
 PROVIDER_TIPS_PREFIXES = (
     LLM_PROVIDER_TIPS_PREFIX,
     TTS_PROVIDER_TIPS_PREFIX,
@@ -22,6 +22,30 @@ PROVIDER_TIPS_PREFIXES = (
 # 避免把完全相同的品牌名复制十份，也避免长说明后续只更新部分语言。
 ENGLISH_FALLBACK_KEYS = frozenset(
     {
+        "Production Intelligence",
+        "Production Intelligence Mode",
+        "Legacy",
+        "Codex Default Model Help",
+        "Codex Auth Unavailable",
+        "Codex Connected",
+        "Codex Login Help",
+        "Codex Headless Login Help",
+        "Refresh Codex Authentication",
+        "Codex Production Help",
+        "Codex Model (optional)",
+        "Codex Reasoning Effort",
+        "Codex Plan Review",
+        "Codex Material Review",
+        "Codex Final Render Review",
+        "Codex Quality Threshold",
+        "Codex Maximum Repair Passes",
+        "Codex Repair Limit Help",
+        "Codex Render Review Scope",
+        "Built-in visuals (no API key)",
+        "Built-in Visuals Help",
+        "Built-in Visuals Require Codex",
+        "Upload Screenshots (optional)",
+        "llm_provider_label.codex",
         "AI Video Quote Required",
         "AI Video Quote Retained For Retry",
         "AI Video Quote Estimate Incomplete",
@@ -47,6 +71,7 @@ ENGLISH_FALLBACK_KEYS = frozenset(
         "Local LLM Script Generation",
         "llm_provider_label.apimart",
         "llm_provider_label.openrouter",
+        "llm_provider_label.api_route",
         "llm_provider_label.shengsuanyun",
         "LoomLoom Poll Retry Pending",
         "LoomLoom Poll Retry Warning",
@@ -87,6 +112,7 @@ ENGLISH_FALLBACK_KEYS = frozenset(
         "Stop Tracking LoomLoom Run",
         "Stop Tracking LoomLoom Run Help",
         "Unavailable AI Video Model",
+        "VoxCPM Speed Not Supported",
     }
 )
 FORMAT_PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")

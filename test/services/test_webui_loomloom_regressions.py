@@ -122,6 +122,7 @@ def test_old_or_invalid_preview_never_changes_recommendation(field, value):
 def test_batch_script_and_video_use_settings_key_without_local_llm():
     values = dict(
         config.app,
+        production_intelligence="legacy",
         llm_provider="openai",
         script_generation_backend="loomloom",
         video_source="loomloom",
@@ -167,6 +168,7 @@ def quote_page():
     """用真实 Streamlit 控件运行失败路径，模拟网络且禁止写配置和提交任务。"""
     values = dict(
         config.app,
+        production_intelligence="legacy",
         video_source="loomloom",
         script_generation_backend="local",
         loomloom_api_token="test-key",
@@ -343,6 +345,7 @@ def test_new_quote_failure_disables_old_confirmation(quote_page):
 def test_batch_candidate_autofill_once_preserves_manual_count(script):
     values = dict(
         config.app,
+        production_intelligence="legacy",
         video_source="loomloom",
         script_generation_backend="loomloom",
         loomloom_api_token="",

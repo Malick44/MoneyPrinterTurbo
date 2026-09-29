@@ -37,11 +37,13 @@ from app.models.llm_provider import (
 )
 from app.models.schema import (
     MaterialInfo,
+    ProductionIntelligenceSettings,
     VideoAspect,
     VideoConcatMode,
     VideoFitMode,
     VideoParams,
     VideoTransitionMode,
+    get_production_intelligence_settings,
 )
 from app.services import bgm as bgm_service
 from app.services import (
@@ -101,6 +103,8 @@ DEFAULT_KOKORO_BASE_URL = "http://127.0.0.1:8880/v1"
 DEFAULT_KOKORO_MODEL = "kokoro"
 # empty = ask the server for its voice list (GET {base_url}/audio/voices)
 DEFAULT_KOKORO_VOICES: list[str] = []
+DEFAULT_VOXCPM_BASE_URL = voice.VOXCPM_DEFAULT_BASE_URL
+DEFAULT_VOXCPM_VOICE = voice.VOXCPM_DEFAULT_VOICE
 ONBOARDING_TOUR_KEY = "mpt-onboarding-v1"
 CUSTOM_LLM_ENDPOINT_ID = "custom"
 VOICE_MODE_TTS = "tts"
@@ -108,26 +112,31 @@ VOICE_MODE_UPLOAD = "upload"
 VOICE_MODE_NONE = "none"
 LOOMLOOM_MAX_POLL_FAILURES = 5
 # WebUI 按素材能力分组展示视频来源，但底层仍保存原有 video_source 值。
-# AI 视频组与设置页共用同一业务顺序：合作服务商优先，并按秘塔、胜算云、
-# 火山引擎排列；其余服务随后展示。这样用户在两个入口看到的顺序一致，同时
+# AI 视频组与设置页共用同一业务顺序：合作服务商优先，并按秘塔、OFox、
+# 胜算云、火山引擎排列；其余服务随后展示。这样两个入口的顺序一致，同时
 # 不改变 config.toml、历史任务和 API 请求中的字段语义，旧用户无需迁移配置。
 VIDEO_SOURCE_GROUPS = {
     "stock_video": ("pexels", "pixabay", "coverr"),
     "ai_video": (
         "metaso_minimax",
+        "ofox",
         "loomloom",
         "volcengine_seedance",
         "wavespeed",
-        "ofox",
     ),
     "ai_image": ("openai_image",),
-    "local": ("local",),
+    "local": ("builtin", "local"),
 }
 # Upload-Post 的 API Key 与发布用户分别在两个页面管理，并且发布用户名称
 # 不等于登录邮箱。集中维护入口可以避免多语言文案各自硬编码 URL 后发生偏差，
 # 也方便用户从 WebUI 直接完成首次配置和后续账号维护。
 UPLOAD_POST_API_KEYS_URL = "https://app.upload-post.com/api-keys"
 UPLOAD_POST_MANAGE_USERS_URL = "https://app.upload-post.com/manage-users"
+# 素材设置与视频来源说明共用推广入口，避免两个位置的链接参数不一致。
+OFOX_REFERRAL_URL = (
+    "https://ofox.ai/?utm_source=github"
+    "&utm_medium=sponsorship&utm_content=moneyprinterturbo"
+)
 # “默认”是 WebUI 专用哨兵，不会写入 config.toml，也不会传给 FFmpeg。
 # 后端在 video_codec 未配置时继续采用稳定的 libx264；单独保留该哨兵可以区分
 # “跟随项目默认策略”和“用户明确固定 libx264”，便于未来安全调整默认策略。
@@ -194,6 +203,7 @@ LOCAL_MATERIAL_EXTENSIONS = {
     ".jpeg",
     ".png",
 }
+BUILTIN_SCREENSHOT_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
 CUSTOM_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 _FINAL_VIDEO_PATTERN = re.compile(
     r"^final-(?P<index>\d+)\.(?P<extension>mp4|mov|mkv|webm)$",
@@ -224,6 +234,7 @@ _RUNTIME_CONFIG_SECTIONS = {
     "minimax_tts": config.minimax_tts,
     "siliconflow": config.siliconflow,
     "fish_audio": config.fish_audio,
+    "voxcpm": config.voxcpm,
     "ui": config.ui,
 }
 # 设置预设与密钥备份使用各自的文件标识。导入时先校验 schema 和版本，
@@ -790,7 +801,8 @@ def _build_restore_upload_requirements(params: Mapping) -> dict:
     素材和自定义音频依赖，并在用户重新生成前检查是否已经主动补充或替换。
     """
     return {
-        "local_materials": params.get("video_source") == "local",
+        "local_materials": params.get("video_source") == "local"
+        or (params.get("video_source") == "builtin" and bool(params.get("video_materials"))),
         "custom_audio": bool(params.get("custom_audio_file")),
         "original_voice_name": params.get("voice_name") or "",
     }
@@ -811,7 +823,7 @@ def _get_unmet_restore_upload_requirements(
 
     if (
         requirements.get("local_materials")
-        and video_source == "local"
+        and video_source in {"local", "builtin"}
         and not has_local_materials
     ):
         unmet.add("local_materials")
@@ -1365,6 +1377,9 @@ def _load_task_restore_payload(task_id):
         return None
 
     params_input = dict(raw_params)
+    # Tasks saved before Production Intelligence always used the legacy flow.
+    # Restoring one must not reinterpret it using a new global Codex default.
+    params_input.setdefault("production_intelligence", "legacy")
     if script_data.get("script"):
         params_input["video_script"] = script_data["script"]
     if script_data.get("search_terms"):
@@ -1402,6 +1417,8 @@ def _infer_tts_server_from_voice(voice_name):
         return "kokoro"
     if voice.is_fish_audio_voice(voice_name):
         return "fish_audio"
+    if voice.is_voxcpm_voice(voice_name):
+        return "voxcpm"
     if voice.is_azure_v2_voice(voice_name):
         return "azure-tts-v2"
     return "azure-tts-v1"
@@ -1431,6 +1448,15 @@ def _apply_restored_params(params):
     新增字段时只更新其中一条路径。调用方必须在渲染任何控件之前执行，否则
     Streamlit 会拒绝修改已经实例化的控件状态。
     """
+    intelligence = get_production_intelligence_settings(params)
+    for key, value in intelligence.model_dump().items():
+        _set_runtime_config("app", key, value)
+        if key in {"production_intelligence", "codex_reasoning_effort"}:
+            _set_stable_widget_value(f"{key}_select", value)
+        else:
+            st.session_state[f"production_{key}_input"] = value
+    st.session_state["codex_model_name_input"] = intelligence.codex_model_name
+
     video_terms = params.get("video_terms") or ""
     if isinstance(video_terms, list):
         video_terms = ", ".join(str(term) for term in video_terms)
@@ -1522,7 +1548,8 @@ def _apply_restored_params(params):
         "subtitle_position_select", params.get("subtitle_position") or "bottom"
     )
     _set_stable_widget_value(
-        "subtitle_display_mode_select", params.get("subtitle_display_mode") or "sentence"
+        "subtitle_display_mode_select",
+        params.get("subtitle_display_mode") or "sentence",
     )
     _set_stable_widget_value(
         "subtitle_animation_select", params.get("subtitle_animation") or "none"
@@ -1930,7 +1957,13 @@ def _render_generation_task_snapshot(task_id, task):
 
     st.success(tr("Video Generation Completed"))
     for warning in task.get("warnings") or []:
-        if isinstance(warning, Mapping) and warning.get("code") == "sonilo_bgm_failed":
+        if isinstance(warning, Mapping) and warning.get("code") == "batch_materials_reused":
+            st.warning(
+                tr("Batch Material Reuse Warning").format(
+                    index=warning.get("video_index", ""), count=warning.get("count", 0)
+                )
+            )
+        elif isinstance(warning, Mapping) and warning.get("code") == "sonilo_bgm_failed":
             st.warning(
                 tr("Sonilo BGM Fallback Warning").format(
                     index=warning.get("video_index", "")
@@ -2076,7 +2109,13 @@ def get_llm_provider_tips(provider_id, **kwargs):
             if service_endpoint
             else provider.effective_default_base_url
         ),
-        "model_docs_url": service_endpoint.model_docs_url if service_endpoint else "",
+        "model_docs_url": (
+            service_endpoint.model_docs_url
+            if service_endpoint and service_endpoint.model_docs_url
+            else provider.effective_model_docs_url(
+                prefer_international=tips_language == "en"
+            )
+        ),
         **{
             f"default_{field.config_suffix}": field.default_value
             for field in provider.extra_fields
@@ -2869,6 +2908,7 @@ def _parse_settings_preset(raw_bytes):
         params_input["bgm_file"] = Path(builtin_bgm_path).name
     # video_subject 是 VideoParams 的必填字段，但预设允许只保存风格设置。
     params_input.setdefault("video_subject", "")
+    params_input.setdefault("production_intelligence", "legacy")
     return VideoParams.model_validate(params_input).model_dump(mode="json")
 
 
@@ -3076,7 +3116,7 @@ def _render_settings_dialog():
             upload_post_enabled = st.checkbox(
                 tr("Enable Upload-Post Integration"),
                 value=is_enabled,
-                key="upload_post_enabled_checkbox"
+                key="upload_post_enabled_checkbox",
             )
             if upload_post_enabled != is_enabled:
                 _set_runtime_config("app", "upload_post_enabled", upload_post_enabled)
@@ -3084,7 +3124,7 @@ def _render_settings_dialog():
             upload_post_auto_upload = st.checkbox(
                 tr("Enable Auto-Publish"),
                 value=is_auto,
-                key="upload_post_auto_upload_checkbox"
+                key="upload_post_auto_upload_checkbox",
             )
             if upload_post_auto_upload != is_auto:
                 _set_runtime_config("app", "upload_post_auto_upload", upload_post_auto_upload)
@@ -3096,7 +3136,7 @@ def _render_settings_dialog():
                 help=tr("Upload-Post API Key Help").format(
                     api_keys_url=UPLOAD_POST_API_KEYS_URL
                 ),
-                key="upload_post_api_key_input"
+                key="upload_post_api_key_input",
             )
             if upload_post_api_key != config.app.get("upload_post_api_key", ""):
                 _set_runtime_config("app", "upload_post_api_key", upload_post_api_key)
@@ -3107,7 +3147,7 @@ def _render_settings_dialog():
                 help=tr("Upload-Post Profile Username Help").format(
                     manage_users_url=UPLOAD_POST_MANAGE_USERS_URL
                 ),
-                key="upload_post_username_input"
+                key="upload_post_username_input",
             )
             if upload_post_username != config.app.get("upload_post_username", ""):
                 _set_runtime_config("app", "upload_post_username", upload_post_username)
@@ -3117,7 +3157,7 @@ def _render_settings_dialog():
                 options=["tiktok", "instagram", "youtube"],
                 default=config.app.get("upload_post_platforms", ["tiktok", "instagram"]),
                 help="Select platforms to publish to",
-                key="upload_post_platforms_multiselect"
+                key="upload_post_platforms_multiselect",
             )
             if upload_post_platforms != config.app.get("upload_post_platforms", ["tiktok", "instagram"]):
                 _set_runtime_config("app", "upload_post_platforms", upload_post_platforms)
@@ -3131,10 +3171,32 @@ def _render_settings_dialog():
                     tr("YouTube Privacy Status"),
                     options=yt_status_options,
                     index=yt_status_options.index(yt_saved),
-                    key="upload_post_youtube_privacy_status_selectbox"
+                    key="upload_post_youtube_privacy_status_selectbox",
                 )
-                if upload_post_youtube_privacy_status != config.app.get("upload_post_youtube_privacy_status", "public"):
-                    _set_runtime_config("app", "upload_post_youtube_privacy_status", upload_post_youtube_privacy_status)
+                if upload_post_youtube_privacy_status != config.app.get(
+                    "upload_post_youtube_privacy_status", "public"
+                ):
+                    _set_runtime_config(
+                        "app",
+                        "upload_post_youtube_privacy_status",
+                        upload_post_youtube_privacy_status,
+                    )
+
+                # 受众声明只影响 YouTube 发布，不改变生成内容或其它平台的请求。
+                # 使用真正的布尔选项，避免把展示文字或字符串当成 API 参数。
+                saved_audience = config.app.get("upload_post_youtube_made_for_kids", False)
+                audience_labels = {False: tr("Not Made for Kids"), True: tr("Made for Kids")}
+                made_for_kids = st.selectbox(
+                    tr("YouTube Audience"),
+                    options=[False, True],
+                    # 非法配置保持未选择，不在打开设置时擅自改成非儿童声明。
+                    index=int(saved_audience) if isinstance(saved_audience, bool) else None,
+                    format_func=audience_labels.get,
+                    help=tr("YouTube Audience Help"),
+                    key="upload_post_youtube_made_for_kids_selectbox",
+                )
+                if isinstance(made_for_kids, bool):
+                    _set_runtime_config("app", "upload_post_youtube_made_for_kids", made_for_kids)
 
         # 左侧面板 - 日志设置
         with left_config_panel:
@@ -3206,14 +3268,12 @@ def _render_settings_dialog():
                 # 选择服务区域，再由 Registry 同步 API 申请入口和 Base URL，
                 # 避免手工组合错误。已有空 Base URL 配置继续沿用中国站，只有
                 # 尚未填写 Key 的全新配置才根据界面语言推荐对应入口。
-                selected_service_endpoint = (
-                    llm_provider_spec.select_service_endpoint(
-                        configured_llm_base_url,
-                        has_api_key=bool(str(llm_api_key).strip()),
-                        prefer_international=(
-                            st.session_state.get("ui_language", "en") != "zh"
-                        ),
-                    )
+                selected_service_endpoint = llm_provider_spec.select_service_endpoint(
+                    configured_llm_base_url,
+                    has_api_key=bool(str(llm_api_key).strip()),
+                    prefer_international=(
+                        st.session_state.get("ui_language", "en") != "zh"
+                    ),
                 )
                 endpoint_options = [
                     endpoint.endpoint_id
@@ -3355,22 +3415,35 @@ def _render_settings_dialog():
                     tr("Model Name"),
                     value=llm_model_name,
                     key=f"{llm_provider}_model_name_input",
+                    **(
+                        {
+                            "on_change": _sync_codex_model_widgets,
+                            "args": ("codex_model_name_input",),
+                            "help": tr("Codex Default Model Help"),
+                        }
+                        if llm_provider == "codex"
+                        else {}
+                    ),
                 )
+            if llm_provider == "codex":
+                with llm_form_panel:
+                    _render_codex_auth_status("llm")
             # 输入框展示 Registry 默认值，但配置只保存真实的用户覆盖值。
             # 这样默认模型、Base URL 更新后，未自定义的用户能够自动跟随。
-            _set_runtime_config(
-                "app",
-                llm_provider_spec.config_key("api_key"),
-                st_llm_api_key,
-            )
-            _set_runtime_config(
-                "app",
-                llm_provider_spec.config_key("base_url"),
-                normalize_provider_override(
-                    st_llm_base_url,
-                    llm_default_base_url,
-                ),
-            )
+            if llm_provider != "codex":
+                _set_runtime_config(
+                    "app",
+                    llm_provider_spec.config_key("api_key"),
+                    st_llm_api_key,
+                )
+                _set_runtime_config(
+                    "app",
+                    llm_provider_spec.config_key("base_url"),
+                    normalize_provider_override(
+                        st_llm_base_url,
+                        llm_default_base_url,
+                    ),
+                )
             _set_runtime_config(
                 "app",
                 llm_provider_spec.config_key("model_name"),
@@ -3477,7 +3550,7 @@ def _render_settings_dialog():
                 st.caption(tr("AI Video Generation APIs Help"))
 
                 # 视频生成 Provider 按赞助商优先展示，赞助商内部顺序
-                # 与商务约定保持一致：秘塔、胜算云、火山引擎。
+                # 与 VIDEO_SOURCE_GROUPS 一致：秘塔、OFox、胜算云、火山引擎。
                 st.markdown(f"**{tr('Metaso MiniMax H3')}**")
                 metaso_api_key = st.text_input(
                     tr("Metaso MiniMax API Key"),
@@ -3556,6 +3629,78 @@ def _render_settings_dialog():
                     _set_runtime_config(
                         "app", "metaso_minimax_resolution", metaso_resolution
                     )
+
+                st.divider()
+                st.markdown("**OfoxAI**")
+                st.caption(f"[OfoxAI]({OFOX_REFERRAL_URL}) · {tr('OFox AI Video Help')}")
+                ofox_api_key = st.text_input(
+                    tr("OFox API Key"),
+                    value=str(config.app.get("ofox_api_key", "") or ""),
+                    type="password",
+                    key="ofox_api_key_input",
+                )
+                _set_runtime_config("app", "ofox_api_key", ofox_api_key.strip())
+                ofox_model = st.text_input(
+                    tr("OFox Text-to-Video Model"),
+                    value=str(
+                        config.app.get(
+                            "ofox_text_to_video_model",
+                            ofox.DEFAULT_MODEL_ID,
+                        )
+                        or ofox.DEFAULT_MODEL_ID
+                    ),
+                    key="ofox_text_to_video_model_input",
+                )
+                _set_runtime_config(
+                    "app", "ofox_text_to_video_model", ofox_model.strip()
+                )
+                configured_ofox_base_url = str(
+                    config.app.get("ofox_base_url", ofox.DEFAULT_BASE_URL)
+                    or ofox.DEFAULT_BASE_URL
+                ).strip()
+                ofox_base_url = st.text_input(
+                    tr("OFox Base URL"),
+                    value=(
+                        ""
+                        if configured_ofox_base_url == ofox.DEFAULT_BASE_URL
+                        else configured_ofox_base_url
+                    ),
+                    placeholder=ofox.DEFAULT_BASE_URL,
+                    key="ofox_base_url_input",
+                )
+                _set_runtime_config(
+                    "app",
+                    "ofox_base_url",
+                    ofox_base_url.strip() or ofox.DEFAULT_BASE_URL,
+                )
+                ofox_vendor_options = [
+                    (tr("OFox Vendor BytePlus"), "byteplus"),
+                    (tr("OFox Vendor Volcengine"), "volcengine"),
+                    (tr("OFox Vendor Auto"), ""),
+                ]
+                configured_ofox_vendor = str(
+                    config.app.get("ofox_provider", ofox.DEFAULT_PROVIDER_TYPE)
+                    or ""
+                ).strip()
+                if configured_ofox_vendor not in {
+                    value for _, value in ofox_vendor_options
+                }:
+                    # 用户在 config.toml 手工钉定了其它厂商名时保留该选择，
+                    # 避免打开设置页就被下拉框覆盖回默认值。
+                    ofox_vendor_options.append(
+                        (configured_ofox_vendor, configured_ofox_vendor)
+                    )
+                selected_ofox_vendor = stable_selectbox(
+                    tr("OFox Upstream Vendor"),
+                    options=[value for _, value in ofox_vendor_options],
+                    default_value=configured_ofox_vendor,
+                    key="ofox_provider_select",
+                    format_func=lambda value: dict(
+                        (v, label) for label, v in ofox_vendor_options
+                    )[value],
+                    help=tr("OFox Upstream Vendor Help"),
+                )
+                _set_runtime_config("app", "ofox_provider", selected_ofox_vendor)
 
                 st.divider()
                 st.markdown(f"**{tr('Shengsuan Cloud AI Video')}**")
@@ -3674,76 +3819,6 @@ def _render_settings_dialog():
                 )
                 _save_material_api_keys("wavespeed_api_keys", wavespeed_api_key)
 
-                st.divider()
-                st.markdown("**OFox**")
-                ofox_api_key = st.text_input(
-                    tr("OFox API Key"),
-                    value=str(config.app.get("ofox_api_key", "") or ""),
-                    type="password",
-                    key="ofox_api_key_input",
-                )
-                _set_runtime_config("app", "ofox_api_key", ofox_api_key.strip())
-                ofox_model = st.text_input(
-                    tr("OFox Text-to-Video Model"),
-                    value=str(
-                        config.app.get(
-                            "ofox_text_to_video_model",
-                            ofox.DEFAULT_MODEL_ID,
-                        )
-                        or ofox.DEFAULT_MODEL_ID
-                    ),
-                    key="ofox_text_to_video_model_input",
-                )
-                _set_runtime_config(
-                    "app", "ofox_text_to_video_model", ofox_model.strip()
-                )
-                configured_ofox_base_url = str(
-                    config.app.get("ofox_base_url", ofox.DEFAULT_BASE_URL)
-                    or ofox.DEFAULT_BASE_URL
-                ).strip()
-                ofox_base_url = st.text_input(
-                    tr("OFox Base URL"),
-                    value=(
-                        ""
-                        if configured_ofox_base_url == ofox.DEFAULT_BASE_URL
-                        else configured_ofox_base_url
-                    ),
-                    placeholder=ofox.DEFAULT_BASE_URL,
-                    key="ofox_base_url_input",
-                )
-                _set_runtime_config(
-                    "app",
-                    "ofox_base_url",
-                    ofox_base_url.strip() or ofox.DEFAULT_BASE_URL,
-                )
-                ofox_vendor_options = [
-                    (tr("OFox Vendor BytePlus"), "byteplus"),
-                    (tr("OFox Vendor Volcengine"), "volcengine"),
-                    (tr("OFox Vendor Auto"), ""),
-                ]
-                configured_ofox_vendor = str(
-                    config.app.get("ofox_provider", ofox.DEFAULT_PROVIDER_TYPE)
-                    or ""
-                ).strip()
-                if configured_ofox_vendor not in {
-                    value for _, value in ofox_vendor_options
-                }:
-                    # 用户在 config.toml 手工钉定了其它厂商名时保留该选择，
-                    # 避免打开设置页就被下拉框覆盖回默认值。
-                    ofox_vendor_options.append(
-                        (configured_ofox_vendor, configured_ofox_vendor)
-                    )
-                selected_ofox_vendor = stable_selectbox(
-                    tr("OFox Upstream Vendor"),
-                    options=[value for _, value in ofox_vendor_options],
-                    default_value=configured_ofox_vendor,
-                    key="ofox_provider_select",
-                    format_func=lambda value: dict(
-                        (v, label) for label, v in ofox_vendor_options
-                    )[value],
-                    help=tr("OFox Upstream Vendor Help"),
-                )
-                _set_runtime_config("app", "ofox_provider", selected_ofox_vendor)
 
             with st.container(border=True):
                 st.markdown(f"#### {tr('AI Image Generation APIs')}")
@@ -3852,8 +3927,6 @@ def _effective_script_generation_backend():
         app_config_snapshot.get("script_generation_backend", "local") or "local"
     ).strip()
     return backend if backend in {"local", "loomloom"} else "local"
-
-
 
 
 def _script_generation_method_help(selected_backend):
@@ -4357,6 +4430,19 @@ def _loomloom_script_signature(
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _production_script_config(params, app_config_snapshot):
+    if params.production_intelligence != "codex":
+        return app_config_snapshot
+    return {
+        **app_config_snapshot,
+        **{
+            key: getattr(params, key)
+            for key in ProductionIntelligenceSettings.model_fields
+        },
+        "llm_provider": "codex",
+    }
+
+
 def _render_local_script_generation(params):
     """保留 MoneyPrinterTurbo 原有的本地 LLM 脚本生成路径。"""
     if not st.button(
@@ -4376,6 +4462,7 @@ def _render_local_script_generation(params):
     with st.spinner(tr("Generating Video Script and Keywords")):
 
         def generate_script_and_terms(app_config_snapshot):
+            app_config_snapshot = _production_script_config(params, app_config_snapshot)
             script = llm.generate_script(
                 video_subject=params.video_subject,
                 language=params.video_language,
@@ -4712,11 +4799,116 @@ def _render_loomloom_script_generation(params):
     _render_loomloom_candidates()
 
 
+def _sync_codex_model_widgets(source_key):
+    """Keep the provider and production forms consistent when both are open."""
+    target_key = (
+        "production_codex_model_name_input"
+        if source_key == "codex_model_name_input"
+        else "codex_model_name_input"
+    )
+    st.session_state[target_key] = st.session_state.get(source_key, "")
+
+
+def _render_codex_auth_status(key_suffix):
+    """Read only subscription status; never load or display credentials in UI."""
+    status_key = "codex_subscription_auth_status"
+    if status_key not in st.session_state:
+        try:
+            from app.intelligence.runtime import CodexRuntime
+
+            st.session_state[status_key] = CodexRuntime().auth_status()
+        except Exception:
+            st.session_state[status_key] = {
+                "authenticated": False,
+                "message": tr("Codex Auth Unavailable"),
+            }
+    status = st.session_state[status_key]
+    if status.get("authenticated"):
+        st.success(tr("Codex Connected"))
+    else:
+        st.warning(status.get("message") or tr("Codex Auth Unavailable"))
+        st.caption(tr("Codex Login Help"))
+        st.code("uv run python -m app.intelligence.runtime login", language="bash")
+        st.caption(tr("Codex Headless Login Help"))
+    if st.button(
+        tr("Refresh Codex Authentication"), key=f"codex_auth_refresh_{key_suffix}"
+    ):
+        st.session_state.pop(status_key, None)
+        st.rerun()
+
+
+def _render_production_intelligence_settings(params):
+    settings = get_production_intelligence_settings(
+        config.snapshot_config_with_pending(config.app)
+    ).model_dump()
+    with st.expander(tr("Production Intelligence"), expanded=False):
+        mode_labels = {
+            "legacy": tr("Legacy"),
+            "codex": tr("llm_provider_label.codex"),
+        }
+        settings["production_intelligence"] = stable_selectbox(
+            tr("Production Intelligence Mode"),
+            options=["legacy", "codex"],
+            default_value=settings["production_intelligence"],
+            key="production_intelligence_select",
+            format_func=mode_labels.get,
+        )
+        if settings["production_intelligence"] == "codex":
+            st.caption(tr("Codex Production Help"))
+            _render_codex_auth_status("production")
+            settings["codex_model_name"] = st.text_input(
+                tr("Codex Model (optional)"),
+                value=settings["codex_model_name"] or "",
+                key="production_codex_model_name_input",
+                help=tr("Codex Default Model Help"),
+                on_change=_sync_codex_model_widgets,
+                args=("production_codex_model_name_input",),
+            )
+            settings["codex_reasoning_effort"] = stable_selectbox(
+                tr("Codex Reasoning Effort"),
+                options=["none", "minimal", "low", "medium", "high", "xhigh"],
+                default_value=settings["codex_reasoning_effort"],
+                key="codex_reasoning_effort_select",
+            )
+            for key, label in (
+                ("codex_review_enabled", "Codex Plan Review"),
+                ("codex_material_review_enabled", "Codex Material Review"),
+                ("codex_render_review_enabled", "Codex Final Render Review"),
+            ):
+                settings[key] = st.checkbox(
+                    tr(label), value=settings[key], key=f"production_{key}_input"
+                )
+            if settings["codex_render_review_enabled"]:
+                st.caption(tr("Codex Render Review Scope"))
+            settings["codex_quality_threshold"] = st.slider(
+                tr("Codex Quality Threshold"),
+                min_value=0.0,
+                max_value=10.0,
+                value=settings["codex_quality_threshold"],
+                step=0.1,
+                key="production_codex_quality_threshold_input",
+            )
+            settings["codex_max_repair_passes"] = st.slider(
+                tr("Codex Maximum Repair Passes"),
+                min_value=0,
+                max_value=10,
+                value=settings["codex_max_repair_passes"],
+                step=1,
+                key="production_codex_max_repair_passes_input",
+                help=tr("Codex Repair Limit Help"),
+            )
+    validated = ProductionIntelligenceSettings.model_validate(settings)
+    for key, value in validated.model_dump().items():
+        setattr(params, key, value)
+        _set_runtime_config("app", key, value)
+
+
 def _render_script_settings(panel, params):
     """渲染文案设置并更新生成参数。"""
     with panel:
         with st.container(border=True):
             st.write(tr("Video Script Settings"))
+            _render_production_intelligence_settings(params)
             # 标签行需要容纳“配置大模型”入口，因此无法继续使用 text_area
             # 内置标签。把标签和输入框收进同一个字段容器后，可覆盖内部间距，
             # 同时让该字段与页面上的其它表单控件保持一致的外部节奏。
@@ -4773,9 +4965,11 @@ def _render_script_settings(panel, params):
             # 同时避免样式误伤页面顶部的“基础设置”等其他折叠区域。
             with st.container(key="advanced_settings_script"):
                 with st.expander(tr("Advanced Script Settings"), expanded=False):
-                    script_backend_options = ["local", "loomloom"]
+                    codex_scripts = params.production_intelligence == "codex"
+                    script_backend_options = ["local"] if codex_scripts else ["local", "loomloom"]
                     script_backend_labels = {
-                        "local": tr("Local LLM Script Generation"),
+                        "local": tr("llm_provider_label.codex")
+                        if codex_scripts else tr("Local LLM Script Generation"),
                         "loomloom": tr("Shengsuan Cloud Batch Script Generation"),
                     }
                     script_backend_widget_key = localized_widget_key(
@@ -4791,11 +4985,15 @@ def _render_script_settings(panel, params):
                         default_value=_effective_script_generation_backend(),
                         key="script_generation_backend_select",
                         format_func=lambda value: script_backend_labels[value],
-                        help=_script_generation_method_help(current_script_backend),
+                        help=tr("Codex Production Help")
+                        if codex_scripts
+                        else _script_generation_method_help(current_script_backend),
+                        disabled=codex_scripts,
                     )
-                    _set_runtime_config(
-                        "app", "script_generation_backend", script_generation_backend
-                    )
+                    if not codex_scripts:
+                        _set_runtime_config(
+                            "app", "script_generation_backend", script_generation_backend
+                        )
 
                     params.paragraph_number = st.slider(
                         tr("Script Paragraph Number"),
@@ -4860,7 +5058,11 @@ def _render_script_settings(panel, params):
                         )
 
             # 模型发现只增强视频素材，不改变用户明确选择的文案 Provider。
-            if _effective_script_generation_backend() == "loomloom":
+            use_loomloom_scripts = (
+                params.production_intelligence != "codex"
+                and _effective_script_generation_backend() == "loomloom"
+            )
+            if use_loomloom_scripts:
                 _render_loomloom_script_generation(params)
             else:
                 _render_local_script_generation(params)
@@ -4870,7 +5072,7 @@ def _render_script_settings(panel, params):
                 height=180,
                 key="video_script",
             )
-            if _effective_script_generation_backend() == "loomloom":
+            if use_loomloom_scripts:
                 st.caption(tr("LoomLoom Video Terms Reuse Help"))
             elif st.button(
                 tr("Generate Video Keywords"),
@@ -4892,7 +5094,7 @@ def _render_script_settings(panel, params):
                                 params.video_script,
                                 amount=8 if params.match_materials_to_script else 5,
                                 match_script_order=params.match_materials_to_script,
-                                app_config=app_config_snapshot,
+                                app_config=_production_script_config(params, app_config_snapshot),
                             ),
                         )
                         if "Error: " in terms:
@@ -4927,6 +5129,7 @@ def _render_video_settings(panel, params):
                 "metaso_minimax": tr("Metaso MiniMax H3"),
                 "loomloom": tr("Shengsuan Cloud AI Video"),
                 "openai_image": tr("OpenAI Compatible Text-to-Image"),
+                "builtin": tr("Built-in visuals (no API key)"),
                 "local": tr("Local file"),
             }
             saved_video_source_name = str(
@@ -4961,21 +5164,36 @@ def _render_video_settings(panel, params):
             if params.video_source == "volcengine_seedance":
                 st.caption(tr("Volcano Engine Seedance Help"))
             if params.video_source == "ofox":
-                st.caption(tr("OFox AI Video Help"))
+                st.caption(f"[OfoxAI]({OFOX_REFERRAL_URL}) · {tr('OFox AI Video Help')}")
             if params.video_source == "metaso_minimax":
                 st.caption(tr("Metaso MiniMax H3 Help"))
-            if params.video_source == "local":
+            if params.video_source == "builtin":
+                st.caption(tr("Built-in Visuals Help"))
+                if params.production_intelligence != "codex":
+                    st.warning(tr("Built-in Visuals Require Codex"))
+            if params.video_source in {"local", "builtin"}:
                 # Streamlit 的文件类型校验对扩展名大小写敏感，这里同时放行大小写两种形式。
+                material_extensions = (
+                    BUILTIN_SCREENSHOT_EXTENSIONS
+                    if params.video_source == "builtin"
+                    else LOCAL_MATERIAL_EXTENSIONS
+                )
                 local_file_types = sorted(
                     extension.removeprefix(".")
-                    for extension in LOCAL_MATERIAL_EXTENSIONS
+                    for extension in material_extensions
                 )
                 uploaded_files = st.file_uploader(
-                    tr("Upload Local Files"),
+                    tr("Upload Screenshots (optional)")
+                    if params.video_source == "builtin"
+                    else tr("Upload Local Files"),
                     type=local_file_types
                     + [file_type.upper() for file_type in local_file_types],
                     accept_multiple_files=True,
-                    key="local_video_materials_uploader",
+                    key=(
+                        "builtin_screenshots_uploader"
+                        if params.video_source == "builtin"
+                        else "local_video_materials_uploader"
+                    ),
                 )
 
             # 文案顺序匹配会从关键词生成到最终合成全程保持叙事顺序，因此开启时
@@ -5486,6 +5704,13 @@ def _get_voice_preview_provider_signature(tts_server: str) -> dict:
             "model_id": config.kokoro.get("model_id", ""),
             "credential": _credential_signature(config.kokoro.get("api_key", "")),
         }
+    if tts_server == "voxcpm":
+        return {
+            "base_url": config.voxcpm.get("base_url", ""),
+            "model_id": config.voxcpm.get("model_id", ""),
+            "voice_id": config.voxcpm.get("voice_id", "default"),
+            "credential": _credential_signature(config.voxcpm.get("api_key", "")),
+        }
     return {}
 
 
@@ -5956,6 +6181,26 @@ def _sync_elevenlabs_api_key_input():
     return entered_key
 
 
+def _sync_voxcpm_api_key_input():
+    """恢复 VoxCPM 密码控件在重连时被 Streamlit 重放的空状态。"""
+    widget_key = "voxcpm_api_key_input"
+    configured_key = str(config.voxcpm.get("api_key", "") or "").strip()
+    had_widget_state = widget_key in st.session_state
+    entered_key = str(st.session_state.get(widget_key, "") or "").strip()
+
+    if not entered_key and configured_key:
+        # 浏览器重连可能重放空密码状态。保留已保存凭据，避免本次 rerun
+        # 通过 _set_runtime_config 把 config.toml 中的有效 Key 覆盖为空。
+        st.session_state[widget_key] = configured_key
+        entered_key = configured_key
+        if had_widget_state:
+            logger.debug("restored VoxCPM API key after empty session replay")
+    elif not had_widget_state:
+        st.session_state[widget_key] = entered_key
+
+    return entered_key
+
+
 def _render_elevenlabs_api_key_input(label_key):
     """
     渲染 ElevenLabs TTS 与配乐共用的唯一 API Key 输入状态。
@@ -6329,6 +6574,7 @@ def _render_audio_settings(panel, params):
                 ("chatterbox", "Chatterbox TTS"),
                 ("kokoro", "Kokoro TTS"),
                 ("fish_audio", "Fish Audio TTS"),
+                ("voxcpm", "VoxCPM TTS"),
             ]
 
             tts_server_values = [server_value for server_value, _ in tts_servers]
@@ -6404,6 +6650,8 @@ def _render_audio_settings(panel, params):
                 filtered_voices = _get_kokoro_voice_options(saved_voice_name)
             elif selected_tts_server == "fish_audio":
                 filtered_voices = voice.get_fish_audio_voices()
+            elif selected_tts_server == "voxcpm":
+                filtered_voices = voice.get_voxcpm_voices()
             else:
                 # 获取Azure的声音列表
                 all_voices = voice.get_all_azure_voices(filter_locals=None)
@@ -6437,6 +6685,8 @@ def _render_audio_settings(panel, params):
                         display_name.replace("Female", tr("Female"))
                         .replace("Male", tr("Male"))
                     )
+                if voice.is_voxcpm_voice(v):
+                    return v.split(":", 1)[1] or DEFAULT_VOXCPM_VOICE
                 return (
                     v.replace("Female", tr("Female"))
                     .replace("Male", tr("Male"))
@@ -6658,6 +6908,42 @@ def _render_audio_settings(panel, params):
                 )
                 _set_runtime_config("fish_audio", "model", fish_model)
 
+            # ModelBest hosts VoxCPM behind its streaming Audio Speech API.
+            # The fixed provider endpoint is still editable for compatible
+            # gateways, while the user only has to supply an API key and a
+            # speech_synthesis-capable model id for the standard platform.
+            if tts_mode_enabled and (
+                selected_tts_server == "voxcpm"
+                or (voice_name and voice.is_voxcpm_voice(voice_name))
+            ):
+                _sync_voxcpm_api_key_input()
+                voxcpm_api_key = st.text_input(
+                    tr("VoxCPM API Key"),
+                    type="password",
+                    key="voxcpm_api_key_input",
+                )
+                _set_runtime_config("voxcpm", "api_key", voxcpm_api_key)
+
+                voxcpm_model = st.text_input(
+                    tr("VoxCPM Model ID"),
+                    value=config.voxcpm.get("model_id", ""),
+                    key="voxcpm_model_id_input",
+                    placeholder=tr("VoxCPM Model ID Placeholder"),
+                )
+                _set_runtime_config("voxcpm", "model_id", voxcpm_model.strip())
+
+                voxcpm_base_url = st.text_input(
+                    tr("VoxCPM Base URL"),
+                    value=config.voxcpm.get("base_url") or DEFAULT_VOXCPM_BASE_URL,
+                    key="voxcpm_base_url_input",
+                    placeholder=DEFAULT_VOXCPM_BASE_URL,
+                )
+                _set_runtime_config(
+                    "voxcpm",
+                    "base_url",
+                    (voxcpm_base_url or DEFAULT_VOXCPM_BASE_URL).strip().rstrip("/"),
+                )
+
             # Chatterbox API settings section (self-hosted, OpenAI-compatible)
             if tts_mode_enabled and (
                 selected_tts_server == "chatterbox"
@@ -6790,6 +7076,10 @@ def _render_audio_settings(panel, params):
                     )
 
                 with voice_control_cols[1]:
+                    is_voxcpm = bool(
+                        selected_tts_server == "voxcpm"
+                        or (voice_name and voice.is_voxcpm_voice(voice_name))
+                    )
                     params.voice_rate = stable_selectbox(
                         tr("Voiceover Speed"),
                         options=voice_rate_options,
@@ -6798,7 +7088,12 @@ def _render_audio_settings(panel, params):
                         ),
                         key="voice_rate_select",
                         format_func=lambda value: f"{value:.1f}×",
-                        help=tr("Voiceover Speed Help"),
+                        help=(
+                            tr("VoxCPM Speed Not Supported")
+                            if is_voxcpm
+                            else tr("Voiceover Speed Help")
+                        ),
+                        disabled=is_voxcpm,
                     )
                 _set_runtime_config("ui", "voice_volume", params.voice_volume)
                 _set_runtime_config("ui", "voice_rate", params.voice_rate)
@@ -7175,9 +7470,15 @@ def _render_generation_controls(
     restore_upload_requirements = st.session_state.get(
         "task_restore_upload_requirements", {}
     )
-    has_local_materials = bool(
-        uploaded_files or st.session_state.get("local_video_materials", [])
-    )
+    saved_local_materials = st.session_state.get("local_video_materials", [])
+    if params.video_source == "builtin":
+        saved_local_materials = [
+            item for item in saved_local_materials
+            if item.get("provider", "local") == "local"
+            and os.path.splitext(item.get("url", ""))[1].lower()
+            in BUILTIN_SCREENSHOT_EXTENSIONS
+        ]
+    has_local_materials = bool(uploaded_files or saved_local_materials)
     has_custom_audio = bool(uploaded_audio_file)
     unmet_restore_requirements = _get_unmet_restore_upload_requirements(
         restore_upload_requirements,
@@ -7228,10 +7529,16 @@ def _render_generation_controls(
             "metaso_minimax",
             "loomloom",
             "openai_image",
+            "builtin",
             "local",
         ]:
             _remove_active_generation_task(task_id)
             st.error(tr("Please Select a Valid Video Source"))
+            st.stop()
+
+        if params.video_source == "builtin" and params.production_intelligence != "codex":
+            _remove_active_generation_task(task_id)
+            st.error(tr("Built-in Visuals Require Codex"))
             st.stop()
 
         if params.video_source == "pexels" and not config.app.get(
@@ -7385,6 +7692,11 @@ def _render_generation_controls(
             st.error(tr("Please Upload Local Materials First"))
             st.stop()
 
+        if "local_materials" in unmet_restore_requirements:
+            _remove_active_generation_task(task_id)
+            st.error(tr("Task Restore Local Materials Warning"))
+            st.stop()
+
         if voice_mode == VOICE_MODE_UPLOAD and not uploaded_audio_file:
             # 上传音频是用户显式选择的配音方式，缺少文件时不能静默退回 TTS。
             # 在任务启动前拦截，避免产生与用户选择不一致的成片。
@@ -7451,7 +7763,9 @@ def _render_generation_controls(
                     file_path = _build_uploaded_file_path(
                         file,
                         local_videos_dir,
-                        LOCAL_MATERIAL_EXTENSIONS,
+                        BUILTIN_SCREENSHOT_EXTENSIONS
+                        if params.video_source == "builtin"
+                        else LOCAL_MATERIAL_EXTENSIONS,
                         "material",
                     )
                 except ValueError:
@@ -7474,11 +7788,11 @@ def _render_generation_controls(
             # 将已上传并保存到本地的视频素材写入会话，供后续只改文案时直接复用。
             st.session_state["local_video_materials"] = persisted_local_materials
         elif (
-            params.video_source == "local" and st.session_state["local_video_materials"]
+            params.video_source in {"local", "builtin"} and saved_local_materials
         ):
             # 当用户没有重新上传文件时，复用最近一次已经保存到磁盘的本地素材列表。
             params.video_materials = []
-            for material_entry in st.session_state["local_video_materials"]:
+            for material_entry in saved_local_materials:
                 m = MaterialInfo()
                 m.provider = material_entry.get("provider", "local")
                 m.url = material_entry.get("url", "")

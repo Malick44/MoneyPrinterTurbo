@@ -45,6 +45,7 @@ _CLI_VIDEO_SOURCES = (
     "ofox",
     "metaso_minimax",
     "openai_image",
+    "builtin",
     "local",
 )
 
@@ -79,6 +80,24 @@ def _paragraph_count(value: str) -> int:
     if parsed < 1 or parsed > 10:
         raise argparse.ArgumentTypeError(
             f"paragraph-number must be between 1 and 10, got {parsed}"
+        )
+    return parsed
+
+
+def _codex_quality_threshold(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or not 0 <= parsed <= 10:
+        raise argparse.ArgumentTypeError(
+            "codex-quality-threshold must be between 0 and 10"
+        )
+    return parsed
+
+
+def _codex_repair_passes(value: str) -> int:
+    parsed = int(value)
+    if not 0 <= parsed <= 10:
+        raise argparse.ArgumentTypeError(
+            "codex-max-repair-passes must be between 0 and 10"
         )
     return parsed
 
@@ -179,6 +198,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "Generate MoneyPrinterTurbo videos without the WebUI.\n\n"
             "Provider settings and credentials are read from config.toml.\n"
             "Default full-video generation requires a configured LLM and Pexels API key.\n"
+            "Use --production-intelligence codex --video-source builtin for local visuals "
+            "with ChatGPT sign-in and no media API key.\n"
             "The default Edge TTS voice requires no API key."
         ),
         epilog="""
@@ -197,6 +218,10 @@ Examples:
 
   Stop after script generation:
     uv run python cli.py --video-subject "How AI is changing everyday life" --stop-at script
+
+  Use Codex subscription planning and reviews (requires local ChatGPT sign-in):
+    uv run python cli.py --video-subject "How AI is changing everyday life" \\
+      --production-intelligence codex --codex-reasoning-effort high
 
   Run a JSON array or JSONL manifest. CLI options provide defaults and each object
   overrides VideoParams fields for one task:
@@ -230,6 +255,48 @@ Batch manifests:
   status, result, failed_stage, and error.
 """,
         formatter_class=_CliHelpFormatter,
+    )
+
+    intelligence_group = parser.add_argument_group("production intelligence")
+    intelligence_group.add_argument(
+        "--production-intelligence",
+        choices=["legacy", "codex"],
+        default=None,
+        help="production workflow; default: [app].production_intelligence or legacy",
+    )
+    intelligence_group.add_argument(
+        "--codex-model-name",
+        default=None,
+        help="optional Codex model override; an empty string uses Codex's current default",
+    )
+    intelligence_group.add_argument(
+        "--codex-reasoning-effort",
+        default=None,
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        help="Codex reasoning effort; default: [app].codex_reasoning_effort or medium",
+    )
+    for flag, label in (
+        ("codex-review-enabled", "adversarial production plan review"),
+        ("codex-material-review-enabled", "scene material contact-sheet review"),
+        ("codex-render-review-enabled", "final rendered-frame contact-sheet review"),
+    ):
+        intelligence_group.add_argument(
+            f"--{flag}",
+            action=argparse.BooleanOptionalAction,
+            default=None,
+            help=f"enable {label}; default: saved setting or enabled",
+        )
+    intelligence_group.add_argument(
+        "--codex-quality-threshold",
+        type=_codex_quality_threshold,
+        default=None,
+        help="minimum review score between 0 and 10; default: saved setting or 8.5",
+    )
+    intelligence_group.add_argument(
+        "--codex-max-repair-passes",
+        type=_codex_repair_passes,
+        default=None,
+        help="bounded repair attempts, 0–10; default: saved setting or 2",
     )
 
     content_group = parser.add_argument_group("script and content")
@@ -277,14 +344,18 @@ Batch manifests:
         "--video-source",
         default="pexels",
         choices=_CLI_VIDEO_SOURCES,
-        help="video material provider; online providers require matching API keys in config.toml",
+        help=(
+            "video material provider; builtin renders locally without media API keys "
+            "and requires Codex intelligence; online providers require their own credentials"
+        ),
     )
     material_group.add_argument(
         "--video-materials",
         default="",
         metavar="PATH[,PATH...]",
         help=(
-            "comma-separated local image/video paths for --video-source local; relative "
+            "comma-separated local image/video paths for --video-source local, or optional "
+            "screenshot image paths for --video-source builtin; relative "
             "paths use the current working directory, then storage/local_videos as a "
             "compatibility fallback; absolute paths are accepted"
         ),
@@ -389,7 +460,7 @@ Batch manifests:
             f"config.toml, otherwise {DEFAULT_VOICE_NAME}. A saved "
             "[ui].voice_mode of 'none' or 'upload' resolves to no-voice "
             "instead, unless this option is given. "
-            "Use 'no-voice' for silent output. Provider-specific identifiers "
+            "Use 'no-voice' to disable narration; add --bgm-type none for silent output. Provider-specific identifiers "
             "use prefixes such as gemini:, mimo:, elevenlabs:, chatterbox:, and kokoro:"
         ),
     )
@@ -605,8 +676,10 @@ Batch manifests:
             "--video-materials is required with --video-source local when "
             "--stop-at is materials or video"
         )
-    if not args.batch_file and args.video_source != "local" and has_video_materials:
-        parser.error("--video-materials can only be used with --video-source local")
+    if not args.batch_file and args.video_source not in {"local", "builtin"} and has_video_materials:
+        parser.error("--video-materials can only be used with --video-source local or builtin")
+    if not args.batch_file and args.video_source == "builtin" and args.production_intelligence == "legacy":
+        parser.error("--video-source builtin requires --production-intelligence codex")
     if (
         not args.batch_file
         and args.video_source == "volcengine_seedance"
@@ -783,6 +856,14 @@ def build_video_params(args: argparse.Namespace) -> VideoParams:
     }
 
     optional_arg_names = [
+        "production_intelligence",
+        "codex_model_name",
+        "codex_reasoning_effort",
+        "codex_review_enabled",
+        "codex_material_review_enabled",
+        "codex_render_review_enabled",
+        "codex_quality_threshold",
+        "codex_max_repair_passes",
         "video_language",
         "paragraph_number",
         "video_script_prompt",
@@ -996,7 +1077,7 @@ def _resolve_batch_entry_paths(
 
     if (
         "video_materials" in override_fields
-        and params.video_source == "local"
+        and params.video_source in {"local", "builtin"}
         and params.video_materials
     ):
         for material in params.video_materials:
@@ -1044,8 +1125,8 @@ def _validate_batch_task_params(
             "video_materials is required with video_source=local when "
             "stop_at is materials or video"
         )
-    if params.video_source != "local" and params.video_materials:
-        raise ValueError("video_materials can only be used with video_source=local")
+    if params.video_source not in {"local", "builtin"} and params.video_materials:
+        raise ValueError("video_materials can only be used with video_source=local or builtin")
     if (
         params.video_source == "volcengine_seedance"
         and stop_at in {"materials", "video"}
@@ -1353,7 +1434,7 @@ def _validate_cli_files(
         # 下游根据 resource/fonts 内的文件名拼接路径，因此仍保留纯文件名。
         params.font_name = os.path.basename(font_path)
 
-    if params.video_source != "local" or stop_at not in {"materials", "video"}:
+    if params.video_source not in {"local", "builtin"} or stop_at not in {"materials", "video"}:
         return "", []
 
     local_videos_dir = utils.storage_dir("local_videos")

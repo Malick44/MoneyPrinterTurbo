@@ -15,6 +15,7 @@ from openai.types.chat import ChatCompletion
 
 from app.config import config
 from app.models.llm_provider import DEFAULT_LLM_PROVIDER_ID, get_llm_provider
+from app.utils import utils
 
 _max_retries = 5
 MIN_SCRIPT_PARAGRAPH_NUMBER = 1
@@ -328,6 +329,16 @@ def _generate_response(prompt: str, app_config=None) -> str:
                     f"{llm_provider}: {field.config_suffix} is not set, "
                     "please set it in the config.toml file."
                 )
+
+        if adapter == "codex":
+            from app.intelligence.runtime import CodexRuntime
+
+            runtime = CodexRuntime(
+                model=model_name or None,
+                reasoning_effort=runtime_app_config.get("codex_reasoning_effort")
+                or "medium",
+            )
+            return _normalize_text_response(runtime.generate_text(prompt), llm_provider)
 
         if adapter == "qwen":
             import dashscope
@@ -829,6 +840,7 @@ def generate_terms(
     match_script_order: bool = False,
     app_config=None,
 ) -> List[str]:
+    video_script = utils.remove_pause_tags(video_script or "").strip()
     if match_script_order:
         goal = (
             f"Generate {amount} chronological stock-video search terms that follow "

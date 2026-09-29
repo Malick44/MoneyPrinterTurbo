@@ -1,9 +1,18 @@
 import warnings
 from enum import Enum
+from collections.abc import Mapping
+from pathlib import PurePath
 from typing import Any, List, Literal, Optional, Union
 
 import pydantic
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.config import config
 
@@ -88,7 +97,55 @@ class MaterialInfo:
     source_info: Optional[dict[str, Any]] = None
 
 
-class VideoParams(BaseModel):
+class ProductionIntelligenceSettings(BaseModel):
+    """Portable, credential-free controls shared by the API, CLI, and WebUI."""
+
+    production_intelligence: Literal["legacy", "codex"] = "legacy"
+    codex_model_name: Optional[str] = Field(default="", max_length=200)
+    codex_reasoning_effort: Literal[
+        "none", "minimal", "low", "medium", "high", "xhigh"
+    ] = "medium"
+    codex_review_enabled: bool = True
+    codex_material_review_enabled: bool = True
+    codex_render_review_enabled: bool = True
+    codex_quality_threshold: float = Field(
+        default=8.5, ge=0, le=10, allow_inf_nan=False
+    )
+    codex_max_repair_passes: int = Field(default=2, ge=0, le=10)
+
+    @field_validator("codex_model_name", mode="before")
+    @classmethod
+    def normalize_codex_model_name(cls, value):
+        return (
+            value.strip()
+            if isinstance(value, str)
+            else ("" if value is None else value)
+        )
+
+
+def get_production_intelligence_settings(
+    config_values: Mapping[str, Any] | None = None,
+) -> ProductionIntelligenceSettings:
+    """Read current defaults; invalid hand-edited settings fall back per field.
+
+    Request values still use strict model validation. This tolerant path is only
+    for saved configuration and never reads or returns authentication material.
+    """
+    source = config.app if config_values is None else config_values
+    values = {
+        key: source[key]
+        for key in ProductionIntelligenceSettings.model_fields
+        if key in source
+    }
+    try:
+        return ProductionIntelligenceSettings.model_validate(values)
+    except ValidationError as exc:
+        for error in exc.errors():
+            values.pop(error["loc"][0], None)
+        return ProductionIntelligenceSettings.model_validate(values)
+
+
+class VideoParams(ProductionIntelligenceSettings):
     """
     {
       "video_subject": "",
@@ -115,7 +172,14 @@ class VideoParams(BaseModel):
     match_materials_to_script: bool = False
     video_count: int = Field(default=1, ge=1)
 
-    video_source: Optional[str] = "pexels"
+    video_source: Optional[str] = Field(
+        default="pexels",
+        description=(
+            "Material provider. 'builtin' creates charts, diagrams, text cards and "
+            "icon compositions locally, with optional local screenshot images; "
+            "requires production_intelligence='codex'."
+        ),
+    )
     video_materials: Optional[List[MaterialInfo]] = (
         None  # Materials used to generate the video
     )
@@ -159,6 +223,31 @@ class VideoParams(BaseModel):
     paragraph_number: int = Field(default=1, ge=1, le=10)
     video_script_prompt: str = Field(default="", max_length=2000)
     custom_system_prompt: str = Field(default="", max_length=8000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_intelligence_defaults(cls, values):
+        # Resolve at request time, so config changes apply without a restart.
+        if isinstance(values, Mapping):
+            return {**get_production_intelligence_settings().model_dump(), **values}
+        return values
+
+    @model_validator(mode="after")
+    def validate_builtin_source(self):
+        if self.video_source != "builtin":
+            return self
+        if self.production_intelligence != "codex":
+            raise ValueError("video_source=builtin requires production_intelligence=codex")
+        for material in self.video_materials or []:
+            if (
+                material.provider != "local"
+                or "://" in material.url
+                or PurePath(material.url).suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}
+            ):
+                raise ValueError(
+                    "builtin screenshot assets must be local PNG, JPG, JPEG or BMP images"
+                )
+        return self
 
 
 class SubtitleRequest(BaseModel):

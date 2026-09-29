@@ -188,6 +188,7 @@ def test_loomloom_model_reference_prices_match_known_models_and_ignore_new_ones(
 def test_loomloom_webui_quotes_then_requires_confirmation_before_execute():
     test_config = dict(
         config.app,
+        production_intelligence="legacy",
         llm_provider="openai",
         script_generation_backend="loomloom",
         loomloom_base_url="https://example.test/loom/v1",
@@ -513,6 +514,7 @@ def test_loomloom_zero_video_quote_warns_about_actual_charges():
 def test_selected_shengsuanyun_provider_hides_duplicate_loomloom_key_input():
     test_config = dict(
         config.app,
+        production_intelligence="legacy",
         llm_provider="shengsuanyun",
         shengsuanyun_api_key="provider-key",
         script_generation_backend="local",
@@ -560,6 +562,7 @@ def test_selected_shengsuanyun_provider_hides_duplicate_loomloom_key_input():
 def test_paused_script_run_keeps_remote_id_until_user_stops_tracking():
     test_config = dict(
         config.app,
+        production_intelligence="legacy",
         llm_provider="openai",
         script_generation_backend="loomloom",
         loomloom_base_url="https://example.test/loom/v1",
