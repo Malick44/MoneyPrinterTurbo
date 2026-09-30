@@ -188,6 +188,9 @@ Thanks to [Kimi](https://platform.kimi.ai?track_id=track-f6b0a640d35c41deb03b247
 - [x] Upload your own **local images and videos**, or get HD stock footage from [Pexels (free)](https://www.pexels.com/api/), [Pixabay (free)](https://pixabay.com/api/docs/), and [Coverr](https://coverr.co/developers?ctx=header_navigation)
 - [x] Use **Search Clips** to search a persistent footage library by captions, semantic meaning, OCR and visual evidence, then approve exact clips with source provenance.
 - [x] Organize research in **Case Workspaces**, with footage first, separate legal/audio/still searches, versioned citations, source requests and explicit production storyboards.
+- [x] Write **documentary narration from reviewed case evidence**, with cited drafts, factual review, original-sound quotes and scene footage requirements. See the [documentary writing workflow](docs/documentary-writing.md).
+- [x] Open the **Documentary workspace** for a full-page case workflow: Footage → Sources & evidence → Facts & timeline → Script → Sound → Edit & export. Saved work appears first, and source setup and detailed controls remain available in optional panels.
+- [x] Add **cinematic sound to aligned narration**, with word-anchored tension cues, an explicit WAV effect library, reviewed placements and WAV/JSON/OTIO exports. See the [sound design workflow](docs/cinematic-sound.md).
 - [x] Generate `768P` or `2K` source footage with [Metaso MiniMax H3](https://metaso.cn/minimax-h3/?s=MPT), with 4–15 second clips in `9:16`, `16:9`, or `1:1`
 - [x] Create multiple AI video clips with [Shengsuan Cloud AI Video](https://www.shengsuanyun.com/?from=CH_XUQ4OTSK), then combine them with the project's voiceover, subtitle, and editing workflow
 - [x] Use the native [Volcano Engine Ark Seedance](https://console.volcengine.com/ark/region:ark+cn-beijing/apikey) integration to generate cohesive visuals from individual script segments

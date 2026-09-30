@@ -49,7 +49,9 @@ KINDS = {
     ".geojson": "map",
 }
 ASSET_KINDS = frozenset((*KINDS.values(), "map", "other", "reference"))
-PRODUCTION_ROLES = {"production", "narration", "script", "production_transcript"}
+PRODUCTION_ROLES = {
+    "production", "narration", "script", "production_transcript", "sound_effect", "sfx"
+}
 OUTPUT_FOLDERS = {"research", "derived", "exports", "case_originals"}
 OUTPUT_FILENAMES = {"case.json", "case_manifest.json"}
 
@@ -1712,6 +1714,9 @@ class CaseWorkspace:
         return retrieve_supporting(self, case_id, query, filters or {}, top_k)
 
     def export_case(self, case_id):
+        from .acoustic_pipeline import AcousticPipeline
+        from .documentary import DocumentaryWriter
+
         case = self.get_case(case_id)
         assets = self.list_assets(case_id)
         with self.repo.connect() as connection:
@@ -1741,6 +1746,8 @@ class CaseWorkspace:
             "events": self.list_events(case_id),
             "entities": self.list_entities(case_id),
             "storyboards": self.list_storyboards(case_id),
+            "documentaries": DocumentaryWriter(self).list_documents(case_id),
+            "acoustic_plans": AcousticPipeline(self).list_plans(case_id),
             "export_kind": "inventory_and_citations",
             "media_included": False,
         }

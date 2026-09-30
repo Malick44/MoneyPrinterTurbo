@@ -35,6 +35,21 @@ def _task_root(repo, task_id: str) -> Path:
 def _check_artifact(repo, artifact: dict, requested_use: str) -> Path:
     if not artifact:
         raise SearchError("Artifact was not found", status_code=404)
+    if artifact["kind"] in {
+        "acoustic_mix", "acoustic_timeline", "acoustic_otio",
+        "case_render", "case_render_manifest",
+    }:
+        from .case_workspace import CaseWorkspace
+        from .service import SearchService
+
+        workspace = CaseWorkspace(SearchService(repo.root))
+        if artifact["kind"].startswith("acoustic_"):
+            from .acoustic_compositor import authorize_mix_artifact
+
+            return authorize_mix_artifact(workspace, artifact["id"], requested_use)
+        from .case_production import authorize_render_artifact
+
+        return authorize_render_artifact(workspace, artifact["id"], requested_use)
     approval_id = artifact.get("approval_id")
     intrinsic_use = artifact.get("metadata", {}).get("requested_use", "internal_review")
     if approval_id:

@@ -139,6 +139,41 @@ def transcribe_source(service, payload: dict) -> dict:
 
 def _dispatch(service, job: dict) -> dict:
     kind, payload = job["job_type"], job["payload"]
+    if kind in {"case_acoustic_analyze", "case_acoustic_mix"}:
+        from .acoustic_pipeline import AcousticPipeline
+        from .case_workspace import CaseWorkspace
+
+        workspace = CaseWorkspace(service)
+        pipeline = AcousticPipeline(workspace)
+        if kind == "case_acoustic_analyze":
+            return pipeline.analyze(
+                payload["case_id"], payload["options"],
+                expected_input_hash=payload["input_hash"],
+            )
+        from .acoustic_compositor import render_mix
+
+        record = pipeline.authorize_plan(
+            payload["case_id"], payload["plan_id"],
+            expected_revision=payload["revision"], expected_hash=payload["content_hash"],
+        )
+        return render_mix(workspace, record)
+    if kind == "case_documentary":
+        from .case_workspace import CaseWorkspace
+        from .documentary import DocumentaryWriter
+
+        writer = DocumentaryWriter(CaseWorkspace(service))
+        options = payload["options"]
+        if options.get("document_id") and options.get("stage", "outline") != "outline":
+            document = writer.get_document(payload["case_id"], options["document_id"])
+            if document["revision"] != payload.get("document_revision"):
+                raise SearchError(
+                    "Documentary draft changed; enqueue its current revision", 409
+                )
+        return writer.generate(
+            payload["case_id"],
+            options,
+            expected_packet_hash=payload["packet_hash"],
+        )
     if kind in {"case_index", "case_render", "case_align"}:
         from .case_workspace import CaseWorkspace
 

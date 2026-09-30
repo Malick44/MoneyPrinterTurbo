@@ -82,6 +82,11 @@ TABLES = frozenset(
         "case_citations",
         "case_storyboards",
         "case_record_versions",
+        "case_documentaries",
+        "documentary_revisions",
+        "documentary_exports",
+        "acoustic_plans",
+        "acoustic_plan_versions",
     }
 )
 ALIASES = {

@@ -254,8 +254,17 @@ def _extract_qwen_generation_text(response) -> str:
     return _normalize_text_response(text, "qwen")
 
 
-def _generate_response(prompt: str, app_config=None) -> str:
+def _generate_response(
+    prompt: str, app_config=None, *, max_output_tokens: int | None = None
+) -> str:
+    """Generate text, optionally replacing Gemini's default output token budget."""
     try:
+        if max_output_tokens is not None and (
+            isinstance(max_output_tokens, bool)
+            or not isinstance(max_output_tokens, int)
+            or max_output_tokens <= 0
+        ):
+            raise ValueError("max_output_tokens must be a positive integer")
         # WebUI 在视频生成期间允许用户准备下一条文案。调用方可以传入提交瞬间
         # 的配置快照，确保模型请求重试期间不会因为后台任务结束并应用新配置，
         # 而切换到另一个 Provider、Base URL 或模型。
@@ -373,7 +382,9 @@ def _generate_response(prompt: str, app_config=None) -> str:
                 temperature=0.5,
                 top_p=1,
                 top_k=1,
-                max_output_tokens=2048,
+                max_output_tokens=2048
+                if max_output_tokens is None
+                else max_output_tokens,
                 safety_settings=[
                     types.SafetySetting(
                         category="HARM_CATEGORY_HARASSMENT",

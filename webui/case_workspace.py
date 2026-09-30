@@ -1,4 +1,4 @@
-"""Case-scoped evidence review and production controls for the search dialog."""
+"""Full-page case workspace for footage, evidence, writing, and production."""
 
 from __future__ import annotations
 
@@ -9,11 +9,16 @@ from pathlib import Path
 
 import streamlit as st
 
+from webui.documentary_writer import DOCUMENTARY_TRANSLATION_KEYS
+from webui.acoustic_pipeline import ACOUSTIC_TRANSLATION_KEYS
+
 VIEWS = (
     "Footage Search",
     "Library",
     "Search Everything",
     "Timeline / Claims",
+    "Documentary Writer",
+    "Cinematic Sound",
     "Production",
 )
 KINDS = (
@@ -245,101 +250,102 @@ def _render_requests(workspace, case_id, tr):
 
 
 def _render_library(workspace, case, service, tr):
+    from urllib.parse import urlsplit
+
     case_id = case["id"]
     st.caption(tr("Case originals help"))
-    relative = (case.get("metadata") or {}).get("workspace_relative_path")
-    if relative:
-        st.session_state.setdefault(
-            _key(case_id, "folder"), str(service.repo.root / relative)
-        )
-    if st.button(tr("Prepare case folders"), key=_key(case_id, "prepare_folders")):
-        try:
-            from app.services.targeted_search.case_workspace_ops import (
-                prepare_case_folder,
-            )
-
-            prepared = prepare_case_folder(workspace, case_id)
-            st.session_state[_key(case_id, "folder")] = str(
-                service.repo.root / prepared["workspace_relative_path"]
-            )
-            st.session_state[_key(case_id, "prepared_folder")] = st.session_state[
-                _key(case_id, "folder")
-            ]
-        except Exception as exc:
-            _error(exc)
-    prepared_path = st.session_state.get(_key(case_id, "prepared_folder"))
-    if prepared_path:
-        st.caption(tr("Prepared case folder help"))
-        st.code(prepared_path, language=None)
-    with st.expander(tr("Import case folder")):
-        with st.form(_key(case_id, "import")):
-            folder = st.text_input(tr("Local case folder"), key=_key(case_id, "folder"))
-            if st.form_submit_button(tr("Import originals")):
-                try:
-                    result = workspace.import_folder(
-                        case_id, folder.strip(), index=False
-                    )
-                    st.success(
-                        tr("Case import summary").format(
-                            **{
-                                name: result.get(name, 0)
-                                for name in (
-                                    "imported",
-                                    "unchanged",
-                                    "updated",
-                                    "skipped",
-                                )
-                            }
-                        )
-                    )
-                except Exception as exc:
-                    _error(exc)
+    imported = st.session_state.pop(_key(case_id, "import_summary"), None)
+    if imported:
+        st.success(imported)
     assets = workspace.list_assets(case_id)
     by_id = {row["id"]: row for row in assets}
+    sources = {row["source_id"]: service.get_source(row["source_id"]) for row in assets}
+    display_labels = {}
+    repeated_labels = {}
+    for row in assets:
+        if (row.get("metadata") or {}).get("linked"):
+            source = sources[row["source_id"]]
+            origin = (
+                source.get("creator_name")
+                or urlsplit(source.get("canonical_url", "")).hostname
+            )
+            label = " · ".join(
+                str(value)
+                for value in (row.get("filename") or source.get("title"), origin)
+                if value
+            )
+            repeated_labels[label] = repeated_labels.get(label, 0) + 1
+            display_labels[row["id"]] = (
+                label
+                if repeated_labels[label] == 1
+                else f"{label} ({repeated_labels[label]})"
+            )
+        else:
+            display_labels[row["id"]] = asset_label(row)
+    states = {
+        "imported": tr("Case source added"),
+        "linked": tr("Case source linked"),
+        "acquired": tr("Case source acquired"),
+        "indexed": tr("Case source searchable"),
+        "partial": tr("Case source partial"),
+        "no_speech": tr("Case source no speech"),
+    }
     st.dataframe(
         [
             {
-                tr("Original filename"): asset_label(row),
-                tr("Asset kind"): row.get("asset_kind", ""),
-                tr("Category"): row.get("category", ""),
-                tr("Index status"): row.get("state", ""),
-                tr("Provenance review"): (row.get("metadata") or {}).get(
-                    "provenance_status", "unreviewed"
+                tr("Original filename"): display_labels[row["id"]],
+                tr("Asset kind"): tr("case_kind." + row.get("asset_kind", "other")),
+                tr("Rights status"): tr(
+                    "rights_status."
+                    + (sources[row["source_id"]].get("policy") or {}).get(
+                        "rights_status", "unknown"
+                    )
                 ),
-                tr("Rights status"): (
-                    service.get_source(row["source_id"]).get("policy") or {}
-                ).get("rights_status", "unknown"),
+                tr("Index status"): states.get(
+                    row.get("state"), str(row.get("state", "")).replace("_", " ")
+                ),
+                tr("Provenance review"): tr(
+                    "Case source reviewed"
+                    if (row.get("metadata") or {}).get("provenance_status")
+                    == "reviewed"
+                    else "Case source unreviewed"
+                )
+                if (row.get("metadata") or {}).get("provenance_status", "unreviewed")
+                in {"reviewed", "unreviewed"}
+                else (row.get("metadata") or {}).get("provenance_status"),
+                tr("Category"): row.get("category", ""),
             }
             for row in assets
         ],
         hide_index=True,
     )
-    selected = st.multiselect(
-        tr("Assets to index"),
-        list(by_id),
-        format_func=lambda value: asset_label(by_id[value]),
-        key=_key(case_id, "index_assets"),
-    )
-    if st.button(
-        tr("Index selected assets"),
-        disabled=not selected,
-        key=_key(case_id, "index_selected"),
-    ):
-        for asset_id in selected:
-            try:
-                workspace.enqueue_index(asset_id)
-                st.success(tr("Indexing queued") + " · " + asset_label(by_id[asset_id]))
-            except Exception as exc:
-                _error(exc)
     if assets:
+        retained_default = next(
+            (index for index, row in enumerate(assets) if row.get("artifact_id")), 0
+        )
         asset_id = st.selectbox(
             tr("Review case asset"),
             list(by_id),
-            format_func=lambda value: asset_label(by_id[value]),
+            index=retained_default,
+            format_func=display_labels.get,
             key=_key(case_id, "review_asset"),
         )
         asset = by_id[asset_id]
-        st.caption(f"SHA-256: {asset.get('sha256', '')} · v{asset.get('version', 1)}")
+        with st.expander(tr("Preview original asset"), expanded=True):
+            if (asset.get("metadata") or {}).get("linked") and not asset.get(
+                "artifact_id"
+            ):
+                st.info(tr("Linked source original not acquired"))
+            else:
+                render_asset_preview(workspace, asset, tr)
+        from webui import targeted_search as footage
+
+        footage._render_policy(service, service.get_source(asset["source_id"]), tr)
+        with st.expander(tr("Source file details")):
+            st.caption(asset["source_id"])
+            st.caption(
+                f"SHA-256: {asset.get('sha256', '')} · v{asset.get('version', 1)}"
+            )
         if (asset.get("metadata") or {}).get("linked") and st.button(
             tr("Refresh retained source original"),
             key=_key(case_id, "refresh_" + asset_id),
@@ -353,11 +359,73 @@ def _render_library(workspace, case, service, tr):
                 )
             except Exception as exc:
                 _error(exc)
-        from webui import targeted_search as footage
+    else:
+        st.info(tr("Case library empty help"))
+    with st.expander(tr("Import case folder")):
+        st.caption(tr("Case folder setup help"))
+        relative = (case.get("metadata") or {}).get("workspace_relative_path")
+        if relative:
+            st.session_state.setdefault(
+                _key(case_id, "folder"), str(service.repo.root / relative)
+            )
+        if st.button(tr("Prepare case folders"), key=_key(case_id, "prepare_folders")):
+            try:
+                from app.services.targeted_search.case_workspace_ops import (
+                    prepare_case_folder,
+                )
 
-        footage._render_policy(service, service.get_source(asset["source_id"]), tr)
-        with st.expander(tr("Preview original asset")):
-            render_asset_preview(workspace, asset, tr)
+                prepared = prepare_case_folder(workspace, case_id)
+                st.session_state[_key(case_id, "folder")] = str(
+                    service.repo.root / prepared["workspace_relative_path"]
+                )
+                st.session_state[_key(case_id, "prepared_folder")] = st.session_state[
+                    _key(case_id, "folder")
+                ]
+            except Exception as exc:
+                _error(exc)
+        prepared_path = st.session_state.get(_key(case_id, "prepared_folder"))
+        if prepared_path:
+            st.caption(tr("Prepared case folder help"))
+            st.code(prepared_path, language=None)
+        with st.form(_key(case_id, "import")):
+            folder = st.text_input(tr("Local case folder"), key=_key(case_id, "folder"))
+            if st.form_submit_button(tr("Import originals")):
+                try:
+                    result = workspace.import_folder(
+                        case_id, folder.strip(), index=False
+                    )
+                    st.session_state[_key(case_id, "import_summary")] = tr(
+                        "Case import summary"
+                    ).format(
+                        **{
+                            name: result.get(name, 0)
+                            for name in ("imported", "unchanged", "updated", "skipped")
+                        }
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    _error(exc)
+    with st.expander(tr("Make case files searchable")):
+        st.caption(tr("Case indexing help"))
+        selected = st.multiselect(
+            tr("Assets to index"),
+            list(by_id),
+            format_func=lambda value: asset_label(by_id[value]),
+            key=_key(case_id, "index_assets"),
+        )
+        if st.button(
+            tr("Index selected assets"),
+            disabled=not selected,
+            key=_key(case_id, "index_selected"),
+        ):
+            for asset_id in selected:
+                try:
+                    workspace.enqueue_index(asset_id)
+                    st.success(
+                        tr("Indexing queued") + " · " + asset_label(by_id[asset_id])
+                    )
+                except Exception as exc:
+                    _error(exc)
     with st.expander(tr("Link existing footage source")):
         sources = service.list_sources()
         by_source = {
@@ -405,18 +473,24 @@ def _render_search_all(workspace, case, service, tr):
         categories = sorted(
             {row.get("category", "") for row in assets if row.get("category")}
         )
+        category_labels = {
+            None: tr("All categories"),
+            **{value: value for value in categories},
+        }
         category = st.selectbox(
             tr("Evidence category filter"),
             [None] + categories,
-            format_func=lambda value: tr("All categories") if value is None else value,
+            format_func=category_labels.get,
         )
         by_asset = {row["id"]: row for row in assets}
+        asset_labels = {
+            None: tr("All case assets"),
+            **{key: asset_label(row) for key, row in by_asset.items()},
+        }
         asset_id = st.selectbox(
             tr("Evidence source filter"),
             [None] + list(by_asset),
-            format_func=lambda value: (
-                tr("All case assets") if value is None else asset_label(by_asset[value])
-            ),
+            format_func=asset_labels.get,
         )
         if st.form_submit_button(tr("Search case workspace")):
             try:
@@ -465,10 +539,13 @@ def _render_search_all(workspace, case, service, tr):
     if results["videos"]:
         st.write(tr("Footage matches"))
         by_id = {row.get("candidate_id") or row["id"]: row for row in results["videos"]}
+        result_labels = {
+            key: footage.candidate_label(row, tr) for key, row in by_id.items()
+        }
         selected = st.selectbox(
             tr("Search result"),
             list(by_id),
-            format_func=lambda value: footage.candidate_label(by_id[value], tr),
+            format_func=result_labels.get,
             key=_key(case_id, "video_result"),
         )
         footage._render_candidate(service, by_id[selected], tr)
@@ -553,141 +630,256 @@ def _render_footage_citation(workspace, case, result, tr):
             _error(exc)
 
 
-def _render_claims_timeline(workspace, case, tr):
-    case_id = case["id"]
-    st.caption(tr("Claims review help"))
-    st.write(tr("Case timeline"))
-    for event in workspace.list_events(case_id):
-        with st.expander(f"{event.get('event_at', '')} · {event.get('title', '')}"):
-            st.write(event.get("notes", ""))
-            st.json(event.get("citations", []))
-    with st.form(_key(case_id, "event_form")):
-        title = st.text_input(tr("Event title"))
-        event_at = st.text_input(
-            tr("Event date and time"), help=tr("Event date uncertainty help")
-        )
-        notes = st.text_area(tr("Event notes"))
-        precision = st.selectbox(
-            tr("Event time precision"),
-            ("unknown", "year", "month", "day", "minute", "second", "range"),
-        )
-        citations = _citations_input(case_id, tr, "event_citations")
-        if st.form_submit_button(tr("Save timeline event")):
-            try:
-                workspace.save_event(
-                    case_id,
-                    {
-                        "title": title.strip(),
-                        "event_at": event_at.strip() or None,
-                        "time_precision": precision,
-                        "notes": notes,
-                        "citations": citations,
-                    },
+def _fact_status_label(value, tr):
+    labels = {
+        "proposed": "Fact needs review",
+        "reviewed": "Fact reviewed",
+        "disputed": "Fact disputed",
+        "insufficient_support": "Fact needs evidence",
+    }
+    return tr(labels[value]) if value in labels else str(value).replace("_", " ")
+
+
+def _fact_class_label(value, tr):
+    labels = {
+        "unclassified": "Fact class unclassified",
+        "allegation": "Fact class allegation",
+        "testimony": "Fact class testimony",
+        "police_report": "Fact class police report",
+        "court_finding": "Fact class court finding",
+        "news_report": "Fact class news report",
+        "editorial": "Fact class editorial",
+        "recording_observation": "Fact class recording observation",
+    }
+    return tr(labels[value]) if value in labels else str(value).replace("_", " ")
+
+
+def _render_fact_citations(citations, assets, tr):
+    for citation in citations:
+        asset = assets.get(citation.get("asset_id"))
+        source = asset_label(asset) if asset else tr("Saved source evidence")
+        relation = {
+            "supports": "Evidence supports",
+            "contradicts": "Evidence conflicts",
+            "mentions": "Evidence mentions",
+        }.get(citation.get("relation", "supports"), "Evidence mentions")
+        st.caption(
+            " · ".join(
+                value
+                for value in (
+                    tr(relation),
+                    source,
+                    locator_label(citation.get("locator")),
                 )
-                st.success(tr("Timeline event saved"))
-            except Exception as exc:
-                _error(exc)
-    st.write(tr("Case claims"))
+                if value
+            )
+        )
+        if citation.get("quote"):
+            st.text(citation["quote"])
+        if citation.get("is_current") is False:
+            st.caption(tr("Evidence source changed"))
+
+
+def _render_claims_timeline(workspace, case, tr):
+    from webui.case_design import render_empty_state
+
+    case_id = case["id"]
+    section_labels = {value: tr(value) for value in ("Facts", "Timeline")}
+    section = st.radio(
+        tr("Facts and timeline"),
+        ("Facts", "Timeline"),
+        format_func=section_labels.get,
+        horizontal=True,
+        key=_key(case_id, "facts_section"),
+    )
+    assets = {row["id"]: row for row in workspace.list_assets(case_id)}
+    if section == "Timeline":
+        events = workspace.list_events(case_id)
+        if not events:
+            render_empty_state(tr("No timeline events yet"), tr("Timeline empty help"))
+        for event in events:
+            with st.container(border=True):
+                st.caption(event.get("event_at") or tr("Event date unknown"))
+                st.text(event.get("title", ""))
+                if event.get("notes"):
+                    st.write(event["notes"])
+                if event.get("has_stale_citations"):
+                    st.warning(tr("Timeline source changed help"))
+                citations = event.get("citations", [])
+                with st.expander(
+                    tr("View source citations").format(count=len(citations))
+                ):
+                    _render_fact_citations(citations, assets, tr)
+        with st.expander(tr("Add a timeline event")):
+            with st.form(_key(case_id, "event_form")):
+                title = st.text_input(tr("Event title"))
+                event_at = st.text_input(
+                    tr("Event date and time"), help=tr("Event date uncertainty help")
+                )
+                notes = st.text_area(tr("Event notes"))
+                precision = st.selectbox(
+                    tr("Event time precision"),
+                    ("unknown", "year", "month", "day", "minute", "second", "range"),
+                )
+                citations = _citations_input(case_id, tr, "event_citations")
+                if st.form_submit_button(tr("Save timeline event")):
+                    try:
+                        workspace.save_event(
+                            case_id,
+                            {
+                                "title": title.strip(),
+                                "event_at": event_at.strip() or None,
+                                "time_precision": precision,
+                                "notes": notes,
+                                "citations": citations,
+                            },
+                        )
+                        st.success(tr("Timeline event saved"))
+                    except Exception as exc:
+                        _error(exc)
+        return
+
+    st.caption(tr("Claims review help"))
     rows = workspace.list_claims(case_id)
     by_id = {row["id"]: row for row in rows}
+    if not rows:
+        render_empty_state(tr("No case facts yet"), tr("Case facts empty help"))
     for row in rows:
-        with st.expander(f"{row.get('status', 'proposed')} · {row.get('text', '')}"):
-            st.write(row.get("notes", ""))
-            st.json(row.get("citations", []))
-    selected = st.selectbox(
-        tr("Claim to edit"),
-        [None] + list(by_id),
-        format_func=lambda value: (
-            tr("New claim") if value is None else by_id[value].get("text", value)
-        ),
-        key=_key(case_id, "claim_id"),
-    )
-    row = by_id.get(selected, {})
-    with st.form(_key(case_id, "claim_form_" + str(selected))):
-        text = st.text_area(tr("Claim text"), value=row.get("text", ""))
-        status = st.selectbox(
-            tr("Claim status"),
-            CLAIM_STATUSES,
-            index=CLAIM_STATUSES.index(row.get("status", "proposed")),
+        with st.container(border=True):
+            status = _fact_status_label(row.get("status", "proposed"), tr)
+            assertion = _fact_class_label(
+                row.get("assertion_class", "unclassified"), tr
+            )
+            st.caption(f"{status} · {assertion}")
+            st.text(row.get("text", ""))
+            if row.get("reviewed_by"):
+                st.caption(tr("Fact reviewed by label") + ": " + row["reviewed_by"])
+            if row.get("has_stale_citations"):
+                st.warning(tr("Fact source changed help"))
+            if row.get("notes"):
+                st.write(row["notes"])
+            citations = row.get("citations", [])
+            with st.expander(tr("View source citations").format(count=len(citations))):
+                _render_fact_citations(citations, assets, tr)
+            if st.button(
+                tr("Review this fact"), key=_key(case_id, "review_fact_" + row["id"])
+            ):
+                st.session_state[_key(case_id, "claim_id")] = row["id"]
+                st.session_state[_key(case_id, "open_fact_review")] = True
+
+    with st.expander(
+        tr("Add or review a case fact"),
+        expanded=st.session_state.get(_key(case_id, "open_fact_review"), False),
+    ):
+        claim_labels = {
+            None: tr("New claim"),
+            **{value: row.get("text", value) for value, row in by_id.items()},
+        }
+        selected = st.selectbox(
+            tr("Claim to edit"),
+            [None] + list(by_id),
+            format_func=claim_labels.get,
+            key=_key(case_id, "claim_id"),
         )
-        reviewer = st.text_input(
-            tr("Claim reviewed by"), value=row.get("reviewed_by", "")
-        )
-        assertion_classes = (
-            "unclassified",
-            "allegation",
-            "testimony",
-            "police_report",
-            "court_finding",
-            "news_report",
-            "editorial",
-            "recording_observation",
-        )
-        assertion_class = st.selectbox(
-            tr("Claim assertion class"),
-            assertion_classes,
-            index=assertion_classes.index(row.get("assertion_class", "unclassified")),
-        )
-        notes = st.text_area(tr("Claim review notes"), value=row.get("notes", ""))
-        citations = _citations_input(
-            case_id,
-            tr,
-            "claim_citations_" + str(selected),
-            [
-                value
-                for value in row.get("citations", [])
-                if value.get("relation", "supports") == "supports"
-            ],
-            label="Supporting evidence citations",
-        )
-        contradictions = _citations_input(
-            case_id,
-            tr,
-            "claim_contradictions_" + str(selected),
-            [
-                value
-                for value in row.get("citations", [])
-                if value.get("relation") == "contradicts"
-            ],
-            label="Contradicting evidence citations",
-        )
-        if st.form_submit_button(tr("Save claim")):
-            try:
-                record = {
-                    "text": text.strip(),
-                    "status": status,
-                    "reviewed_by": reviewer.strip(),
-                    "assertion_class": assertion_class,
-                    "notes": notes,
-                    "citations": [
-                        {**value, "relation": "supports"} for value in citations
-                    ]
-                    + [{**value, "relation": "contradicts"} for value in contradictions]
-                    + [
-                        {
-                            key: value
-                            for key, value in citation.items()
-                            if key
-                            in {
-                                "unit_id",
-                                "asset_id",
-                                "asset_version_id",
-                                "locator",
-                                "quote",
-                                "relation",
+        row = by_id.get(selected, {})
+        with st.form(_key(case_id, "claim_form_" + str(selected))):
+            text = st.text_area(tr("Claim text"), value=row.get("text", ""))
+            status_labels = {
+                value: _fact_status_label(value, tr) for value in CLAIM_STATUSES
+            }
+            status = st.selectbox(
+                tr("Claim status"),
+                CLAIM_STATUSES,
+                index=CLAIM_STATUSES.index(row.get("status", "proposed")),
+                format_func=status_labels.get,
+            )
+            reviewer = st.text_input(
+                tr("Claim reviewed by"), value=row.get("reviewed_by", "")
+            )
+            assertion_classes = (
+                "unclassified",
+                "allegation",
+                "testimony",
+                "police_report",
+                "court_finding",
+                "news_report",
+                "editorial",
+                "recording_observation",
+            )
+            assertion_labels = {
+                value: _fact_class_label(value, tr) for value in assertion_classes
+            }
+            assertion_class = st.selectbox(
+                tr("Claim assertion class"),
+                assertion_classes,
+                index=assertion_classes.index(
+                    row.get("assertion_class", "unclassified")
+                ),
+                format_func=assertion_labels.get,
+            )
+            notes = st.text_area(tr("Claim review notes"), value=row.get("notes", ""))
+            citations = _citations_input(
+                case_id,
+                tr,
+                "claim_citations_" + str(selected),
+                [
+                    value
+                    for value in row.get("citations", [])
+                    if value.get("relation", "supports") == "supports"
+                ],
+                label="Supporting evidence citations",
+            )
+            contradictions = _citations_input(
+                case_id,
+                tr,
+                "claim_contradictions_" + str(selected),
+                [
+                    value
+                    for value in row.get("citations", [])
+                    if value.get("relation") == "contradicts"
+                ],
+                label="Contradicting evidence citations",
+            )
+            if st.form_submit_button(tr("Save claim")):
+                try:
+                    record = {
+                        "text": text.strip(),
+                        "status": status,
+                        "reviewed_by": reviewer.strip(),
+                        "assertion_class": assertion_class,
+                        "notes": notes,
+                        "citations": [
+                            {**value, "relation": "supports"} for value in citations
+                        ]
+                        + [
+                            {**value, "relation": "contradicts"}
+                            for value in contradictions
+                        ]
+                        + [
+                            {
+                                key: value
+                                for key, value in citation.items()
+                                if key
+                                in {
+                                    "unit_id",
+                                    "asset_id",
+                                    "asset_version_id",
+                                    "locator",
+                                    "quote",
+                                    "relation",
+                                }
+                                and value is not None
                             }
-                            and value is not None
-                        }
-                        for citation in row.get("citations", [])
-                        if citation.get("relation") == "mentions"
-                    ],
-                }
-                if selected:
-                    record["id"] = selected
-                workspace.save_claim(case_id, record)
-                st.success(tr("Claim saved"))
-            except Exception as exc:
-                _error(exc)
+                            for citation in row.get("citations", [])
+                            if citation.get("relation") == "mentions"
+                        ],
+                    }
+                    if selected:
+                        record["id"] = selected
+                    workspace.save_claim(case_id, record)
+                    st.success(tr("Claim saved"))
+                except Exception as exc:
+                    _error(exc)
 
 
 def validate_scene(scene, assets):
@@ -773,26 +965,26 @@ def _render_timing_import(workspace, case_id, assets, tr):
                 format_func=lambda value: asset_label(audio[value]),
             )
             scope = st.selectbox(tr("Word timing scope"), ("narration", "source"))
+            script_labels = {
+                None: tr("No script selected"),
+                **{key: asset_label(row) for key, row in scripts.items()},
+            }
             script_id = st.selectbox(
                 tr("Aligned script asset"),
                 [None] + list(scripts),
-                format_func=lambda value: (
-                    tr("No script selected")
-                    if value is None
-                    else asset_label(scripts[value])
-                ),
+                format_func=script_labels.get,
             )
             payload = st.file_uploader(
                 tr("WhisperX word timestamps JSON"), type=["json"]
             )
+            timing_labels = {
+                None: tr("Use uploaded timestamps JSON"),
+                **{key: asset_label(row) for key, row in timing_assets.items()},
+            }
             timing_id = st.selectbox(
                 tr("Imported word timestamps asset"),
                 [None] + list(timing_assets),
-                format_func=lambda value: (
-                    tr("Use uploaded timestamps JSON")
-                    if value is None
-                    else asset_label(timing_assets[value])
-                ),
+                format_func=timing_labels.get,
             )
             confirmed = st.checkbox(
                 tr("Confirm word timing asset binding"), value=False
@@ -849,23 +1041,33 @@ def _render_scene_editor(case_id, assets, claims, tr):
         return
     scenes_key = _key(case_id, "draft_scenes")
     scenes = list(st.session_state.get(scenes_key, []))
+    scene_labels = {None: tr("New scene")}
+    scene_labels.update(
+        {
+            index: tr("Production scene number").format(number=index + 1)
+            + " · "
+            + asset_label(by_id[scene["asset_id"]])
+            if scene.get("asset_id") in by_id
+            else tr("Production scene number").format(number=index + 1)
+            for index, scene in enumerate(scenes)
+        }
+    )
     editing = st.selectbox(
         tr("Scene to edit"),
         [None] + list(range(len(scenes))),
-        format_func=lambda value: (
-            tr("New scene") if value is None else scenes[value]["scene_id"]
-        ),
+        format_func=scene_labels.get,
         key=_key(case_id, "editing_scene"),
     )
     row = scenes[editing] if editing is not None else {}
     selected_asset = (
         row.get("asset_id") if row.get("asset_id") in by_id else next(iter(by_id))
     )
+    asset_labels = {value: asset_label(asset) for value, asset in by_id.items()}
     asset_id = st.selectbox(
         tr("Scene source asset"),
         list(by_id),
         index=list(by_id).index(selected_asset),
-        format_func=lambda value: asset_label(by_id[value]),
+        format_func=asset_labels.get,
     )
     roles = ASSET_ROLES[by_id[asset_id]["asset_kind"]]
     selected_role = row.get("role") if row.get("role") in roles else roles[0]
@@ -914,15 +1116,14 @@ def _render_scene_editor(case_id, assets, claims, tr):
             if by_id[asset_id]["asset_kind"] == "audio"
             and asset.get("asset_kind") in {"image", "map", "document"}
         ]
+        visual_labels = {None: tr("No visual overlay"), **asset_labels}
         visual_id = st.selectbox(
             tr("Visual asset for original sound"),
             visuals,
             index=visuals.index(row.get("visual_asset_id"))
             if row.get("visual_asset_id") in visuals
             else 0,
-            format_func=lambda value: (
-                tr("No visual overlay") if value is None else asset_label(by_id[value])
-            ),
+            format_func=visual_labels.get,
         )
         page = st.number_input(
             tr("Document page number"),
@@ -935,13 +1136,16 @@ def _render_scene_editor(case_id, assets, claims, tr):
             value=int((row.get("visual_locator") or {}).get("page_index", 0)) + 1,
         )
         claim_by_id = {value["id"]: value for value in claims}
+        claim_labels = {
+            value: claim.get("text", value) for value, claim in claim_by_id.items()
+        }
         claim_ids = st.multiselect(
             tr("Scene claim references"),
             list(claim_by_id),
             default=[
                 value for value in row.get("claim_ids", []) if value in claim_by_id
             ],
-            format_func=lambda value: claim_by_id[value].get("text", value),
+            format_func=claim_labels.get,
         )
         citations = _citations_input(
             case_id, tr, "scene_citations_" + str(editing), row.get("citations")
@@ -1017,36 +1221,113 @@ def _render_scene_editor(case_id, assets, claims, tr):
             except Exception as exc:
                 _error(exc)
     if scenes:
+        order_labels = {
+            scene["scene_id"]: tr("Production scene number").format(number=index + 1)
+            for index, scene in enumerate(scenes)
+        }
         order = st.multiselect(
             tr("Storyboard scene order"),
             [row["scene_id"] for row in scenes],
             default=[row["scene_id"] for row in scenes],
+            format_func=order_labels.get,
             key=_key(case_id, "scene_order"),
         )
         if st.button(tr("Apply scene order"), key=_key(case_id, "apply_order")):
             by_scene = {row["scene_id"]: row for row in scenes}
             st.session_state[scenes_key] = [by_scene[value] for value in order]
-        st.dataframe(st.session_state[scenes_key], hide_index=True)
+        st.dataframe(
+            [
+                {
+                    tr("Production scene label"): tr("Production scene number").format(
+                        number=index + 1
+                    ),
+                    tr("Production source label"): asset_labels.get(
+                        scene.get("asset_id"), tr("Production source unavailable")
+                    ),
+                    tr("Production range label"): locator_label(scene.get("locator")),
+                    tr("Production duration label"): round(
+                        scene.get("duration_ms", 0) / 1000, 3
+                    ),
+                }
+                for index, scene in enumerate(st.session_state[scenes_key])
+            ],
+            hide_index=True,
+            width="stretch",
+        )
 
 
 def _render_production(workspace, case, tr):
+    from webui.case_design import render_empty_state, render_steps, request_view
+
     case_id = case["id"]
     assets = workspace.list_assets(case_id)
-    st.caption(tr("Explicit storyboard binding help"))
-    st.caption(tr("Continuous narration timing help"))
     rows = workspace.list_storyboards(case_id)
     by_id = {row["id"]: row for row in rows}
+    storyboard_labels = {
+        None: tr("New storyboard"),
+        **{value: row.get("title", value) for value, row in by_id.items()},
+    }
     selected = st.selectbox(
         tr("Saved storyboard"),
         [None] + list(by_id),
-        format_func=lambda value: (
-            tr("New storyboard") if value is None else by_id[value].get("title", value)
-        ),
+        index=1 if by_id else 0,
+        format_func=storyboard_labels.get,
         key=_key(case_id, "storyboard_id"),
     )
+    render_slot = st.empty()
+    saved_scenes = (by_id.get(selected) or {}).get("scenes", [])
+    draft_scenes = st.session_state.get(_key(case_id, "draft_scenes"), [])
+    if saved_scenes:
+        st.caption(
+            tr("Production edit summary").format(
+                count=len(saved_scenes),
+                seconds=round(
+                    sum(row.get("duration_ms", 0) or 0 for row in saved_scenes) / 1000,
+                    1,
+                ),
+            )
+        )
+    render_jobs = [
+        job
+        for job in workspace.search_service.list_jobs()
+        if job.get("job_type") == "case_render"
+        and (
+            (job.get("payload") or {}).get("case_id") == case_id
+            or (job.get("payload") or {}).get("storyboard_id") in by_id
+        )
+    ]
+    if render_jobs:
+        st.markdown("### " + tr("Production previews and render status"))
+        _render_case_jobs(workspace, case, tr)
+    else:
+        with st.expander(tr("Case processing history")):
+            _render_case_jobs(workspace, case, tr)
+    render_steps(
+        [
+            tr("Production step scenes"),
+            tr("Production step save"),
+            tr("Production step render"),
+        ],
+        2 if saved_scenes else 1 if draft_scenes else 0,
+    )
+    if not saved_scenes and not draft_scenes:
+        render_empty_state(tr("Production empty title"), tr("Production empty help"))
+        script_col, footage_col = st.columns(2)
+        with script_col:
+            if st.button(
+                tr("Production open script"), key=_key(case_id, "production_script")
+            ):
+                request_view(case_id, "Documentary Writer")
+        with footage_col:
+            if st.button(
+                tr("Production find footage"), key=_key(case_id, "production_footage")
+            ):
+                request_view(case_id, "Footage Search")
+    loaded = False
     if selected and st.button(
         tr("Load storyboard for editing"), key=_key(case_id, "load_storyboard")
     ):
+        loaded = True
         row = by_id[selected]
         st.session_state[_key(case_id, "draft_scenes")] = row.get("scenes", [])
         st.session_state[_key(case_id, "storyboard_title")] = row.get("title", "")
@@ -1059,33 +1340,44 @@ def _render_production(workspace, case, tr):
         ).get("script_asset_id")
         st.session_state.pop(_key(case_id, "scene_order"), None)
     scripts = {row["id"]: row for row in assets if row.get("asset_kind") == "script"}
-    script_asset_id = st.selectbox(
-        tr("Final narration script asset"),
-        [None] + list(scripts),
-        format_func=lambda value: (
-            tr("No script selected") if value is None else asset_label(scripts[value])
-        ),
-        key=_key(case_id, "script_asset"),
-    )
-    if script_asset_id and st.button(
-        tr("Load narration script asset"), key=_key(case_id, "load_script")
-    ):
-        try:
-            from app.services.targeted_search.case_media import asset_content
-
-            script_path = Path(
-                asset_content(
-                    workspace, script_asset_id, requested_use="internal_review"
-                )
-            )
-            st.session_state[_key(case_id, "storyboard_script")] = (
-                script_path.read_text(encoding="utf-8-sig")
-            )
-        except Exception as exc:
-            _error(exc)
-    _render_scene_editor(case_id, assets, workspace.list_claims(case_id), tr)
+    with st.expander(tr("Production build scenes"), expanded=loaded):
+        st.caption(tr("Explicit storyboard binding help"))
+        _render_scene_editor(case_id, assets, workspace.list_claims(case_id), tr)
     audio = {row["id"]: row for row in assets if row.get("asset_kind") == "audio"}
-    with st.form(_key(case_id, "save_storyboard")):
+    script_labels = {
+        None: tr("No script selected"),
+        **{value: asset_label(row) for value, row in scripts.items()},
+    }
+    audio_labels = {
+        None: tr("No narration track"),
+        **{value: asset_label(row) for value, row in audio.items()},
+    }
+    with st.expander(tr("Production narration and save"), expanded=loaded):
+        st.caption(tr("Continuous narration timing help"))
+        script_asset_id = st.selectbox(
+            tr("Final narration script asset"),
+            [None] + list(scripts),
+            format_func=script_labels.get,
+            key=_key(case_id, "script_asset"),
+        )
+        if script_asset_id and st.button(
+            tr("Load narration script asset"), key=_key(case_id, "load_script")
+        ):
+            try:
+                from app.services.targeted_search.case_media import asset_content
+
+                script_path = Path(
+                    asset_content(
+                        workspace, script_asset_id, requested_use="internal_review"
+                    )
+                )
+                st.session_state[_key(case_id, "storyboard_script")] = (
+                    script_path.read_text(encoding="utf-8-sig")
+                )
+            except Exception as exc:
+                _error(exc)
+        save_form = st.form(_key(case_id, "save_storyboard"))
+    with save_form:
         title = st.text_input(
             tr("Storyboard title"), key=_key(case_id, "storyboard_title")
         )
@@ -1095,9 +1387,7 @@ def _render_production(workspace, case, tr):
         narration_asset_id = st.selectbox(
             tr("Final narration audio asset"),
             [None] + list(audio),
-            format_func=lambda value: (
-                tr("No narration track") if value is None else asset_label(audio[value])
-            ),
+            format_func=audio_labels.get,
             key=_key(case_id, "narration_asset"),
         )
         if st.form_submit_button(tr("Save storyboard")):
@@ -1141,19 +1431,22 @@ def _render_production(workspace, case, tr):
             except Exception as exc:
                 _error(exc)
     render_id = selected or st.session_state.get(_key(case_id, "last_saved_storyboard"))
-    if st.button(
-        tr("Render saved storyboard"),
-        disabled=not render_id,
-        key=_key(case_id, "render_storyboard"),
-    ):
-        try:
-            job = workspace.enqueue_render(render_id, requested_use="generated_export")
-            st.session_state[_key(case_id, "render_job")] = job["id"]
-            st.success(tr("Storyboard render queued"))
-        except Exception as exc:
-            _error(exc)
+    with render_slot.container():
+        if st.button(
+            tr("Render saved storyboard"),
+            disabled=not render_id,
+            type="primary",
+            key=_key(case_id, "render_storyboard"),
+        ):
+            try:
+                job = workspace.enqueue_render(
+                    render_id, requested_use="generated_export"
+                )
+                st.session_state[_key(case_id, "render_job")] = job["id"]
+                st.success(tr("Storyboard render queued"))
+            except Exception as exc:
+                _error(exc)
     _render_timing_import(workspace, case_id, assets, tr)
-    _render_case_jobs(workspace, case, tr)
 
 
 @st.fragment(run_every="2s")
@@ -1213,90 +1506,352 @@ def _render_case_jobs(workspace, case, tr):
                 _error(exc)
 
 
-def render_workspace(service, tr):
-    from webui import targeted_search as footage
+WORKFLOW_VIEWS = tuple(view for view in VIEWS if view != "Search Everything")
+VIEW_LABELS = {
+    "Footage Search": "Workspace footage",
+    "Library": "Workspace sources",
+    "Timeline / Claims": "Workspace facts",
+    "Documentary Writer": "Workspace script",
+    "Cinematic Sound": "Workspace sound",
+    "Production": "Workspace edit",
+}
+VIEW_DESCRIPTIONS = {
+    "Footage Search": "Workspace footage help",
+    "Library": "Workspace sources help",
+    "Timeline / Claims": "Workspace facts help",
+    "Production": "Workspace edit help",
+}
 
-    workspace = get_workspace(service) if hasattr(service, "repo") else None
-    cases = workspace.list_cases() if workspace else []
-    by_id = {row["id"]: row for row in cases}
-    pending_case = st.session_state.pop("case_workspace_pending_case", None)
-    if pending_case in by_id:
-        st.session_state["targeted_search_case"] = pending_case
-    case_id = st.selectbox(
-        tr("Case workspace"),
-        [None] + list(by_id),
-        format_func=lambda value: (
-            tr("Source library workspace") if value is None else by_id[value]["name"]
+
+def case_readiness(workspace, case_id):
+    """Count retained evidence separately from leads and production assets."""
+    assets = workspace.list_assets(case_id)
+    production_roles = {
+        "production",
+        "narration",
+        "script",
+        "production_transcript",
+        "sound_effect",
+        "sfx",
+    }
+    evidence = [
+        row
+        for row in assets
+        if (row.get("metadata") or {}).get("role") not in production_roles
+        and row.get("asset_kind") != "script"
+    ]
+    return {
+        "retained": sum(bool(row.get("artifact_id")) for row in evidence),
+        "footage_leads": sum(
+            row.get("asset_kind") == "video" and not row.get("artifact_id")
+            for row in evidence
         ),
-        key="targeted_search_case",
-    )
-    footage.switch_scope(case_id)
-    if workspace:
-        with st.expander(tr("Create case workspace")):
-            with st.form("case_create"):
-                name = st.text_input(tr("Case name"))
-                topic = st.text_area(tr("Case topic"))
-                if st.form_submit_button(tr("Create case")):
-                    try:
-                        created = workspace.create_case(name.strip(), topic.strip())
-                        st.session_state["case_workspace_pending_case"] = created["id"]
-                        st.success(tr("Case created"))
-                        st.rerun()
-                    except Exception as exc:
-                        _error(exc)
-    view = st.radio(
-        tr("Workspace view"),
-        VIEWS,
-        index=0,
-        format_func=tr,
-        horizontal=True,
-        key="case_workspace_view",
-    )
-    case = workspace.get_case(case_id) if case_id else None
+        "reviewed_claims": sum(
+            row.get("status") == "reviewed"
+            and bool(row.get("reviewed_by"))
+            and bool(row.get("citations"))
+            and not row.get("has_stale_citations")
+            for row in workspace.list_claims(case_id)
+        ),
+    }
+
+
+def _render_workspace_body(workspace, service, case, view, tr):
+    from webui import targeted_search as footage
+    from webui.case_design import render_empty_state, render_section_header
+
+    case_id = case["id"] if case else None
+    if view in VIEW_DESCRIPTIONS:
+        render_section_header(tr(VIEW_LABELS[view]), tr(VIEW_DESCRIPTIONS[view]))
     if view == "Footage Search":
-        footage._render_capabilities(service, tr)
-        collection_id = footage._render_library(
-            service,
-            tr,
-            collection_id=case["collection_id"] if case else None,
-            case_mode=bool(case),
-            on_source=(lambda source_id: workspace.link_source(case_id, source_id))
+        # The query is the first working control. Adding sources is a secondary task.
+        collection_id = (
+            case["collection_id"]
             if case
-            else None,
+            else st.session_state.get("targeted_search_collection")
         )
+        if not case:
+            collections = service.list_collections()
+            labels = {
+                None: tr("All collections"),
+                **{row["id"]: row["name"] for row in collections},
+            }
+            collection_id = st.selectbox(
+                tr("Source collection"),
+                list(labels),
+                format_func=labels.get,
+                key="targeted_search_collection",
+            )
+        source_ids = workspace.get_case(case_id)["source_ids"] if case else None
         footage._render_query(
             service,
             collection_id,
             tr,
-            source_ids=workspace.get_case(case_id)["source_ids"] if case else None,
+            source_ids=source_ids,
             on_result=(
                 lambda result: _render_footage_citation(workspace, case, result, tr)
             )
             if case
             else None,
         )
-        source_ids = workspace.get_case(case_id)["source_ids"] if case else None
+        with st.expander(tr("Manage footage sources")):
+            footage._render_library(
+                service,
+                tr,
+                collection_id=collection_id,
+                case_mode=True,
+                on_source=(lambda source_id: workspace.link_source(case_id, source_id))
+                if case
+                else None,
+            )
         footage._render_jobs_and_clips(
             service,
             tr,
             source_ids=source_ids,
             collection_id=collection_id if case else None,
         )
+        footage._render_capabilities(service, tr)
     elif case is None:
-        st.info(tr("Select a case workspace"))
+        render_empty_state(tr("Choose a case to continue"), tr("Choose a case help"))
     elif view == "Library":
-        _render_library(workspace, case, service, tr)
-        _render_case_jobs(workspace, case, tr)
-    elif view == "Search Everything":
-        _render_search_all(workspace, case, service, tr)
+        source_views = ("Browse sources", "Find evidence")
+        source_labels = {value: tr(value) for value in source_views}
+        section = st.radio(
+            tr("Case source view"),
+            source_views,
+            format_func=source_labels.get,
+            horizontal=True,
+            key=_key(case_id, "source_tab"),
+        )
+        if section == "Find evidence":
+            _render_search_all(workspace, case, service, tr)
+        else:
+            _render_library(workspace, case, service, tr)
+        with st.expander(tr("Case processing history")):
+            _render_case_jobs(workspace, case, tr)
     elif view == "Timeline / Claims":
         _render_claims_timeline(workspace, case, tr)
+    elif view == "Documentary Writer":
+        from webui.documentary_writer import render_documentary_writer
+
+        render_documentary_writer(workspace, case, tr)
+    elif view == "Cinematic Sound":
+        from webui.acoustic_pipeline import render_acoustic_pipeline
+
+        render_acoustic_pipeline(workspace, case, tr)
     elif view == "Production":
         _render_production(workspace, case, tr)
 
 
+def render_workspace(service, tr):
+    from html import escape
+    from webui import targeted_search as footage
+    from webui.case_design import inject_case_styles, render_empty_state
+
+    if not footage._setting(service, "enabled", True):
+        st.info(tr("Targeted search disabled"))
+        return
+    workspace = get_workspace(service) if hasattr(service, "repo") else None
+    cases = workspace.list_cases() if workspace else []
+    by_id = {row["id"]: row for row in cases}
+    pending_case = st.session_state.pop("case_workspace_pending_case", None)
+    if pending_case in by_id:
+        st.session_state["targeted_search_case"] = pending_case
+    st.session_state.setdefault("targeted_search_case", next(iter(by_id), None))
+    if (
+        st.session_state["targeted_search_case"] not in by_id
+        and st.session_state["targeted_search_case"] is not None
+    ):
+        st.session_state["targeted_search_case"] = next(iter(by_id), None)
+    with st.container(key="case_workspace_shell"):
+        inject_case_styles()
+        picker, create = st.columns([4, 1], vertical_alignment="bottom")
+        with picker:
+            case_labels = {
+                None: tr("Source library workspace"),
+                **{key: row["name"] for key, row in by_id.items()},
+            }
+            case_id = st.selectbox(
+                tr("Case workspace"),
+                list(by_id) + [None],
+                format_func=case_labels.get,
+                key="targeted_search_case",
+            )
+        with create:
+            with st.popover(
+                tr("Create case workspace"), width="stretch", disabled=workspace is None
+            ):
+                with st.form("case_create"):
+                    name = st.text_input(tr("Case name"))
+                    topic = st.text_area(tr("Case topic"))
+                    if st.form_submit_button(tr("Create case")):
+                        try:
+                            created = workspace.create_case(name.strip(), topic.strip())
+                            st.session_state["case_workspace_pending_case"] = created[
+                                "id"
+                            ]
+                            st.rerun()
+                        except Exception as exc:
+                            _error(exc)
+        previous_scope = st.session_state.get("case_workspace_navigation_scope")
+        if previous_scope != case_id:
+            if (
+                previous_scope
+                and st.session_state.get("case_workspace_view") in WORKFLOW_VIEWS
+            ):
+                st.session_state[_key(previous_scope, "last_view")] = st.session_state[
+                    "case_workspace_view"
+                ]
+            st.session_state["case_workspace_view"] = st.session_state.get(
+                _key(case_id, "last_view"), "Footage Search"
+            )
+        st.session_state["case_workspace_navigation_scope"] = case_id
+        footage.switch_scope(case_id)
+        pending_view = st.session_state.pop("case_workspace_pending_view", None)
+        if pending_view == "Search Everything":
+            pending_view = "Library"
+            st.session_state[_key(case_id, "source_tab")] = "Find evidence"
+        if pending_view in WORKFLOW_VIEWS:
+            st.session_state["case_workspace_view"] = pending_view
+        if st.session_state.get("case_workspace_view") not in WORKFLOW_VIEWS:
+            st.session_state["case_workspace_view"] = "Footage Search"
+        case = workspace.get_case(case_id) if case_id else None
+        if case:
+            readiness = case_readiness(workspace, case_id)
+            summary = tr("Case readiness summary").format(**readiness)
+            st.markdown(
+                f'<header class="cw-case-header"><h2>{escape(case["name"])}</h2><p>{escape(summary)}</p></header>',
+                unsafe_allow_html=True,
+            )
+        elif not cases:
+            render_empty_state(
+                tr("Build your first documentary case"),
+                tr("First documentary case help"),
+            )
+        navigation, body = st.columns([1, 4], gap="large")
+        with navigation:
+            with st.container(key="case_workspace_navigation"):
+                view_labels = {
+                    value: tr(VIEW_LABELS[value]) for value in WORKFLOW_VIEWS
+                }
+                view = st.radio(
+                    tr("Workspace view"),
+                    WORKFLOW_VIEWS,
+                    format_func=view_labels.get,
+                    key="case_workspace_view",
+                    label_visibility="collapsed",
+                )
+                st.caption(tr("Workspace navigation help"))
+        st.session_state[_key(case_id, "last_view")] = view
+        with body:
+            _render_workspace_body(workspace, service, case, view, tr)
+
+
 CASE_WORKSPACE_TRANSLATION_KEYS = frozenset(
     [
+        "Production scene number",
+        "Production scene label",
+        "Production source label",
+        "Production source unavailable",
+        "Production range label",
+        "Production duration label",
+        "Production edit summary",
+        "Production previews and render status",
+        "Production step scenes",
+        "Production step save",
+        "Production step render",
+        "Production empty title",
+        "Production empty help",
+        "Production open script",
+        "Production find footage",
+        "Production build scenes",
+        "Production narration and save",
+        "Case source added",
+        "Case source linked",
+        "Case source acquired",
+        "Case source searchable",
+        "Case source partial",
+        "Case source no speech",
+        "Case source reviewed",
+        "Case source unreviewed",
+        "Case library empty help",
+        "Case folder setup help",
+        "Make case files searchable",
+        "Case indexing help",
+        "Facts and timeline",
+        "Facts",
+        "Timeline",
+        "Fact needs review",
+        "Fact reviewed",
+        "Fact disputed",
+        "Fact needs evidence",
+        "Fact class unclassified",
+        "Fact class allegation",
+        "Fact class testimony",
+        "Fact class police report",
+        "Fact class court finding",
+        "Fact class news report",
+        "Fact class editorial",
+        "Fact class recording observation",
+        "Saved source evidence",
+        "Evidence supports",
+        "Evidence conflicts",
+        "Evidence mentions",
+        "Evidence source changed",
+        "No timeline events yet",
+        "Timeline empty help",
+        "Event date unknown",
+        "Timeline source changed help",
+        "View source citations",
+        "Add a timeline event",
+        "No case facts yet",
+        "Case facts empty help",
+        "Fact reviewed by label",
+        "Fact source changed help",
+        "Review this fact",
+        "Add or review a case fact",
+        "Workspace",
+        "Create a video",
+        "Documentary workspace",
+        "Workspace footage",
+        "Workspace sources",
+        "Workspace facts",
+        "Workspace script",
+        "Workspace sound",
+        "Workspace edit",
+        "Workspace footage help",
+        "Workspace sources help",
+        "Workspace facts help",
+        "Workspace edit help",
+        "Manage footage sources",
+        "Case source view",
+        "Browse sources",
+        "Find evidence",
+        "Case processing history",
+        "Choose a case to continue",
+        "Choose a case help",
+        "Build your first documentary case",
+        "First documentary case help",
+        "Case readiness summary",
+        "Workspace navigation help",
+        "Source file details",
+        "Footage search placeholder",
+        "Footage search starting help",
+        "Search filters",
+        "Outline ready",
+        "Draft ready",
+        "Ready for editorial review",
+        "Approved",
+        "Needs revision",
+        "Revision requested",
+        "Cues ready",
+        "Missing sound effects",
+        "Inputs changed",
+        "Complete",
+        "Waiting to start",
+        "In progress",
+        "Retrying",
+        "Needs attention",
         "Background document page number",
         "Continuous narration timing help",
         "Prepare case folders",
@@ -1455,4 +2010,8 @@ CASE_WORKSPACE_TRANSLATION_KEYS = frozenset(
         "case_kind.transcript",
         "case_kind.video",
     ]
+)
+
+CASE_WORKSPACE_TRANSLATION_KEYS |= (
+    DOCUMENTARY_TRANSLATION_KEYS | ACOUSTIC_TRANSLATION_KEYS
 )

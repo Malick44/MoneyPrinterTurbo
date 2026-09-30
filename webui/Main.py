@@ -7876,6 +7876,24 @@ def _render_application():
     restore_succeeded = st.session_state.pop("task_restore_succeeded", False)
     if restore_applied or restore_succeeded:
         st.success(tr("Task Configuration Loaded"))
+        st.session_state["application_video_draft"] = {
+            key: st.session_state[key]
+            for key in ("video_subject", "video_script", "video_terms")
+            if key in st.session_state
+        }
+        st.session_state["application_pending_workspace"] = "video"
+
+    from webui.case_design import render_application_navigation
+
+    if render_application_navigation(tr) == "documentary":
+        from webui.case_workspace import render_workspace
+
+        try:
+            render_workspace(targeted_search_ui.get_search_service(), tr)
+        except Exception as exc:
+            st.error(str(exc))
+        _save_runtime_config()
+        return
 
     with st.container(key="main_settings_grid"):
         panel = st.columns(4)

@@ -474,11 +474,14 @@ def _render_policy(service, source, tr):
         st.caption(tr("Source rights help"))
         with st.form(f"targeted_policy_{source['id']}"):
             status = policy.get("rights_status", "unknown")
+            rights_labels = {
+                value: tr(f"rights_status.{value}") for value in rights_values
+            }
             rights_status = st.selectbox(
                 tr("Rights status"),
                 rights_values,
                 index=rights_values.index(status) if status in rights_values else 0,
-                format_func=lambda value: tr(f"rights_status.{value}"),
+                format_func=rights_labels.get,
             )
             use_options = [
                 "internal_review",
@@ -494,11 +497,12 @@ def _render_policy(service, source, tr):
                     ","
                 )
             ]
+            use_labels = {value: tr(f"requested_use.{value}") for value in use_options}
             permitted_uses = st.multiselect(
                 tr("Permitted use"),
                 use_options,
                 default=[value for value in configured_uses if value in use_options],
-                format_func=lambda value: tr(f"requested_use.{value}"),
+                format_func=use_labels.get,
             )
             reason = st.text_area(
                 tr("Rights evidence and reason"),
@@ -601,10 +605,12 @@ def _render_candidate(service, result, tr):
     validation = st.session_state.get(f"targeted_validation_{candidate_id}")
     if validation:
         st.write(validation.get("reason") or validation.get("decision") or validation)
+    use_options = ["internal_review", "generated_export", "analysis"]
+    use_labels = {value: tr(f"requested_use.{value}") for value in use_options}
     requested_use = st.selectbox(
         tr("Extract clip for"),
-        ["internal_review", "generated_export", "analysis"],
-        format_func=lambda value: tr(f"requested_use.{value}"),
+        use_options,
+        format_func=use_labels.get,
         key=f"targeted_use_{candidate_id}",
     )
     relevant = st.checkbox(
@@ -643,18 +649,30 @@ def _render_candidate(service, result, tr):
 
 def _render_query(service, collection_id, tr, on_result=None, source_ids=None):
     with st.form("targeted_search_query"):
-        query = st.text_input(tr("Search video evidence"))
-        language = st.text_input(tr("Caption language filter"), placeholder="en")
-        rights = st.selectbox(
-            tr("Rights filter"),
-            [None, "allowed_export", "allowed_internal", "review_required", "unknown"],
-            format_func=lambda value: (
-                tr("All rights statuses")
+        query = st.text_input(
+            tr("Search video evidence"), placeholder=tr("Footage search placeholder")
+        )
+        with st.expander(tr("Search filters")):
+            language = st.text_input(tr("Caption language filter"), placeholder="en")
+            rights_options = [
+                None,
+                "allowed_export",
+                "allowed_internal",
+                "review_required",
+                "unknown",
+            ]
+            rights_labels = {
+                value: tr("All rights statuses")
                 if value is None
                 else tr(f"rights_status.{value}")
-            ),
-        )
-        if st.form_submit_button(tr("Search clips")):
+                for value in rights_options
+            }
+            rights = st.selectbox(
+                tr("Rights filter"),
+                rights_options,
+                format_func=rights_labels.get,
+            )
+        if st.form_submit_button(tr("Search clips"), type="primary"):
             try:
                 if not query.strip():
                     raise ValueError(tr("Search query required"))
@@ -680,15 +698,17 @@ def _render_query(service, collection_id, tr, on_result=None, source_ids=None):
                 _error(exc)
     results = st.session_state.get("targeted_search_results")
     if results is None:
+        st.caption(tr("Footage search starting help"))
         return
     if not results:
         st.info(tr("No video evidence found"))
         return
     by_id = {row.get("candidate_id") or row["id"]: row for row in results}
+    result_labels = {key: candidate_label(row, tr) for key, row in by_id.items()}
     selected = st.selectbox(
         tr("Search result"),
         list(by_id),
-        format_func=lambda value: candidate_label(by_id[value], tr),
+        format_func=result_labels.get,
         key="targeted_search_result_select",
     )
     _render_candidate(service, by_id[selected], tr)
@@ -792,7 +812,6 @@ def _render_clip(service, artifact, tr):
 
 @st.fragment(run_every="2s")
 def _render_jobs_and_clips(service, tr, source_ids=None, collection_id=None):
-    st.write(tr("Search processing jobs"))
     jobs = service.list_jobs()
     if source_ids is not None:
         scope = set(source_ids)
@@ -805,20 +824,26 @@ def _render_jobs_and_clips(service, tr, source_ids=None, collection_id=None):
                 and (row.get("payload") or {}).get("collection_id") == collection_id
             )
         ]
-    for job in jobs[:12]:
-        status = job.get("status", "unknown")
-        st.caption(f"{job.get('job_type', '')} · {status}")
-        if status in {"failed", "blocked"} and job.get("last_error"):
-            st.error(job["last_error"])
-    if not jobs:
-        st.caption(tr("No search jobs yet"))
+    active_jobs = [
+        row
+        for row in jobs
+        if row.get("status") in {"queued", "retry", "running", "failed", "blocked"}
+    ]
+    with st.expander(tr("Search processing jobs"), expanded=bool(active_jobs)):
+        for job in jobs[:12]:
+            status = job.get("status", "unknown")
+            st.caption(f"{job.get('job_type', '')} · {status}")
+            if status in {"failed", "blocked"} and job.get("last_error"):
+                st.error(job["last_error"])
+        if not jobs:
+            st.caption(tr("No search jobs yet"))
     artifacts = [row for row in service.list_artifacts() if row.get("kind") == "clip"]
     if source_ids is not None:
         artifacts = [
             row for row in artifacts if row.get("source_id") in set(source_ids)
         ]
-    st.write(tr("Extracted clips"))
     if artifacts:
+        st.write(tr("Extracted clips"))
         by_id = {row["id"]: row for row in artifacts}
         selected = st.selectbox(
             tr("Extracted clip"),
@@ -832,24 +857,12 @@ def _render_jobs_and_clips(service, tr, source_ids=None, collection_id=None):
 
 
 def render_search_button(tr, params):
-    """Open the isolated search dialog and carry selected refs into generation."""
+    """Open footage on the full-page desk and retain refs for video generation."""
     st.session_state.setdefault(SELECTED_ARTIFACTS_KEY, [])
     if st.button(tr("Search clips from source library"), key="targeted_search_open"):
-
-        @st.dialog(tr("Search clips"), width="large", on_dismiss="rerun")
-        def dialog():
-            try:
-                service = get_search_service()
-                if not _setting(service, "enabled", True):
-                    st.info(tr("Targeted search disabled"))
-                    return
-                from webui.case_workspace import render_workspace
-
-                render_workspace(service, tr)
-            except Exception as exc:
-                _error(exc)
-
-        dialog()
+        st.session_state["application_pending_workspace"] = "documentary"
+        st.session_state["case_workspace_pending_view"] = "Footage Search"
+        st.rerun()
     refs = selected_artifact_ids()
     params.search_artifact_ids = refs
     if refs:

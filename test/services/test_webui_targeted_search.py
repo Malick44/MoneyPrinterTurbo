@@ -55,7 +55,7 @@ st.session_state['generation_refs'] = params.search_artifact_ids
         assert app.session_state["generation_refs"] == ["clip-1"]
 
 
-def test_search_dialog_queues_caption_only_discovery():
+def test_footage_shortcut_routes_to_workspace_and_source_form_queues_discovery():
     service = SimpleNamespace(
         settings={"enabled": True},
         list_collections=Mock(return_value=[]),
@@ -73,8 +73,10 @@ ui.render_search_button(lambda key: key, VideoParams(video_subject='fractions'))
         app = AppTest.from_string(script).run()
         _button(app, "Search clips from source library").click().run()
         assert list(app.exception) == []
-        # AppTest reruns the entire script for dialog events. Exercise the form
-        # directly while the browser uses Streamlit's dialog fragment rerun.
+        assert app.session_state["application_pending_workspace"] == "documentary"
+        assert app.session_state["case_workspace_pending_view"] == "Footage Search"
+        service.list_sources.assert_not_called()
+        # Source setup remains available on the full-page footage desk.
         app = AppTest.from_string("""
 from webui import targeted_search as ui
 ui._render_library(ui.get_search_service(), lambda key: key)
@@ -265,3 +267,34 @@ def test_invalid_source_range_never_records_approval(query_app):
     service.approve_download.assert_not_called()
     service.enqueue_clip.assert_not_called()
     assert any("beyond the source duration" in item.value for item in app.error)
+
+
+@pytest.mark.parametrize("locale", ["en", "zh"])
+def test_translated_search_filters_keep_internal_values_across_reruns(locale):
+    service = SimpleNamespace(search=Mock(return_value={"results": []}))
+    script = f"""
+import json
+from pathlib import Path
+import streamlit as st
+from webui import targeted_search as ui
+translations = json.loads(Path({str(Path(__file__).resolve().parents[2] / "webui/i18n")!r}, {locale + ".json"!r}).read_text())["Translation"]
+st.session_state.setdefault("ui_language", {locale!r})
+def tr(key):
+    return translations.get(key, key) if st.session_state["ui_language"] == {locale!r} else key
+ui._render_query(ui.get_search_service(), "collection-a", tr, source_ids=["video-a"])
+"""
+    with patch.object(ui, "get_search_service", return_value=service):
+        app = AppTest.from_string(script).run()
+        assert not list(app.exception)
+        app.text_input[0].set_value("a witness")
+        app.selectbox[0].select("allowed_internal")
+        app.button[0].click().run()
+        assert not list(app.exception)
+        service.search.assert_called_once_with(
+            "a witness",
+            filters={
+                "collection_id": "collection-a",
+                "source_ids": ["video-a"],
+                "rights_status": "allowed_internal",
+            },
+        )

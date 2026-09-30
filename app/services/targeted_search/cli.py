@@ -117,6 +117,75 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("file")
     command.add_argument("--scope", choices=["source", "narration"], default="source")
     command.add_argument("--script-asset")
+    command = commands.add_parser("case-documentary-packet")
+    command.add_argument("case_id")
+    command.add_argument("--claims", nargs="*", default=[])
+    commands.add_parser("case-documentary-list").add_argument("case_id")
+    command = commands.add_parser("case-documentary-write")
+    command.add_argument("case_id")
+    command.add_argument("title")
+    from app.models.documentary import DOCUMENTARY_DEFAULT_MINUTES
+
+    command.add_argument(
+        "--minutes", type=float, default=DOCUMENTARY_DEFAULT_MINUTES,
+        help="Documentary target in minutes (22–28; default 25)",
+    )
+    command.add_argument("--language", default="English")
+    command.add_argument("--claims", nargs="*", default=[])
+    command.add_argument("--instructions", default="")
+    command.add_argument(
+        "--stage", choices=["outline", "draft", "factual_review"], default="outline"
+    )
+    command.add_argument("--document")
+    for name in ["case-documentary-get", "case-documentary-export"]:
+        command = commands.add_parser(name)
+        command.add_argument("case_id")
+        command.add_argument("document_id")
+        if name.endswith("export"):
+            command.add_argument("--revision", required=True, type=int)
+            command.add_argument("--final", action="store_true")
+    command = commands.add_parser("case-documentary-revise")
+    command.add_argument("case_id")
+    command.add_argument("document_id")
+    command.add_argument("file", help="Structured documentary draft JSON")
+    command.add_argument("--revision", required=True, type=int)
+    command = commands.add_parser("case-documentary-review")
+    command.add_argument("case_id")
+    command.add_argument("document_id")
+    command.add_argument("--revision", required=True, type=int)
+    command.add_argument("--reviewer", required=True)
+    command.add_argument("--notes", default="")
+    decision = command.add_mutually_exclusive_group(required=True)
+    decision.add_argument("--approve", action="store_true")
+    decision.add_argument("--reject", action="store_true")
+    commands.add_parser("case-sounds").add_argument("case_id")
+    command = commands.add_parser("case-sound-register")
+    command.add_argument("case_id")
+    command.add_argument("asset_id")
+    command.add_argument("--category", required=True, choices=[
+        "impact", "riser", "drone", "pulse", "ambience", "transition", "foley", "sting",
+    ])
+    command.add_argument("--tags", nargs="*", default=[])
+    command.add_argument("--description", default="")
+    for name in ["case-acoustic-readiness", "case-acoustic-analyze"]:
+        command = commands.add_parser(name)
+        command.add_argument("case_id")
+        command.add_argument("narration_asset_id")
+        command.add_argument("script_asset_id")
+        command.add_argument("--alignment")
+        command.add_argument("--title", default="Cinematic narration mix")
+        command.add_argument("--style", default="Restrained documentary sound design")
+        command.add_argument("--max-cues", type=int, default=20)
+        command.add_argument("--auto-align", action="store_true")
+    commands.add_parser("case-acoustic-list").add_argument("case_id")
+    for name in ["case-acoustic-get", "case-acoustic-edit", "case-acoustic-mix"]:
+        command = commands.add_parser(name)
+        command.add_argument("case_id")
+        command.add_argument("plan_id")
+        if name.endswith("edit"):
+            command.add_argument("file", help="Cue and mix settings JSON")
+        if not name.endswith("get"):
+            command.add_argument("--revision", type=int, required=True)
     command = commands.add_parser("import-collection")
     command.add_argument("file")
     command = commands.add_parser("discover")
@@ -206,6 +275,85 @@ def run(service, args) -> dict | list:
         from .case_workspace import CaseWorkspace
 
         workspace = CaseWorkspace(service)
+        if command in {"case-sounds", "case-sound-register"}:
+            from .sound_assets import list_sounds, register_sound
+
+            workspace.get_case(args.case_id)
+            if command == "case-sounds":
+                return list_sounds(workspace, args.case_id)
+            if workspace.get_asset(args.asset_id)["case_id"] != args.case_id:
+                raise SearchError("Sound asset does not belong to this case", 404)
+            return register_sound(
+                workspace, args.asset_id, args.tags, args.description, args.category,
+            )
+        if command.startswith("case-acoustic-"):
+            from .acoustic_pipeline import AcousticPipeline
+
+            pipeline = AcousticPipeline(workspace)
+            if command in {"case-acoustic-analyze", "case-acoustic-readiness"}:
+                options = {"narration_asset_id": args.narration_asset_id,
+                           "script_asset_id": args.script_asset_id,
+                           "transcript_artifact_id": args.alignment, "title": args.title,
+                           "style": args.style, "max_cues": args.max_cues, "auto_align": args.auto_align}
+                method = pipeline.enqueue if command.endswith("analyze") else pipeline.readiness
+                return method(args.case_id, options)
+            if command == "case-acoustic-list":
+                return pipeline.list_plans(args.case_id)
+            if command == "case-acoustic-get":
+                return pipeline.get_plan(args.case_id, args.plan_id)
+            if command == "case-acoustic-edit":
+                return pipeline.save_plan(
+                    args.case_id, args.plan_id, json.loads(Path(args.file).read_text(encoding="utf-8")),
+                    expected_revision=args.revision,
+                )
+            if command == "case-acoustic-mix":
+                return pipeline.enqueue_mix(args.case_id, args.plan_id, expected_revision=args.revision)
+        if command.startswith("case-documentary-"):
+            from .documentary import DocumentaryWriter
+
+            writer = DocumentaryWriter(workspace)
+            if command == "case-documentary-packet":
+                return writer.build_packet(args.case_id, args.claims or None)
+            if command == "case-documentary-list":
+                return writer.list_documents(args.case_id)
+            if command == "case-documentary-get":
+                return writer.get_document(args.case_id, args.document_id)
+            if command == "case-documentary-write":
+                return writer.enqueue(
+                    args.case_id,
+                    {
+                        "title": args.title,
+                        "target_minutes": args.minutes,
+                        "language": args.language,
+                        "claim_ids": args.claims,
+                        "instructions": args.instructions,
+                        "stage": args.stage,
+                        "document_id": args.document,
+                    },
+                )
+            if command == "case-documentary-revise":
+                return writer.save_revision(
+                    args.case_id,
+                    args.document_id,
+                    json.loads(Path(args.file).read_text(encoding="utf-8")),
+                    expected_revision=args.revision,
+                )
+            if command == "case-documentary-review":
+                return writer.review(
+                    args.case_id,
+                    args.document_id,
+                    args.reviewer,
+                    notes=args.notes,
+                    approved=args.approve,
+                    expected_revision=args.revision,
+                )
+            if command == "case-documentary-export":
+                return writer.export(
+                    args.case_id,
+                    args.document_id,
+                    final=args.final,
+                    expected_revision=args.revision,
+                )
         if command == "cases":
             return workspace.list_cases()
         if command == "case-create":

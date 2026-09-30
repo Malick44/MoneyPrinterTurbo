@@ -23,6 +23,8 @@ from app.models.case_workspace import (
     StoryboardRecord,
 )
 from app.models.exception import HttpException
+from app.models.documentary import DocumentaryOptions
+from app.models.acoustic import AcousticOptions, AcousticPlanEdit, SoundRegistration
 from app.models.search import RightsStatus, SearchError
 from app.utils import utils
 
@@ -53,6 +55,36 @@ class RightsBody(StrictModel):
     reason: str = Field(min_length=1, max_length=4000)
     reviewed_by: str = Field(min_length=1, max_length=200)
     expires_at: str | None = None
+
+
+class DocumentaryEvidenceBody(StrictModel):
+    claim_ids: list[str] = Field(default_factory=list, max_length=100)
+
+
+class DocumentaryRevisionBody(StrictModel):
+    draft: dict
+    expected_revision: int = Field(ge=1, strict=True)
+
+
+class DocumentaryReviewBody(StrictModel):
+    reviewed_by: str = Field(min_length=1, max_length=200)
+    notes: str = Field(default="", max_length=10000)
+    approved: bool
+    expected_revision: int = Field(ge=1, strict=True)
+
+
+class DocumentaryExportBody(StrictModel):
+    final: bool = False
+    expected_revision: int = Field(ge=1, strict=True)
+
+
+class AcousticRevisionBody(StrictModel):
+    record: AcousticPlanEdit
+    expected_revision: int = Field(ge=1, strict=True)
+
+
+class AcousticMixBody(StrictModel):
+    expected_revision: int = Field(ge=1, strict=True)
 
 
 def get_workspace():
@@ -314,6 +346,158 @@ def save_entity(case_id: str, body: RecordBody):
 @endpoint
 def save_mention(case_id: str, body: RecordBody):
     return _response(get_workspace().save_mention(case_id, body.record))
+
+
+def _acoustic_pipeline():
+    from app.services.targeted_search.acoustic_pipeline import AcousticPipeline
+
+    return AcousticPipeline(get_workspace())
+
+
+@router.get("/cases/{case_id}/sounds")
+@endpoint
+def sounds(case_id: str):
+    from app.services.targeted_search.sound_assets import list_sounds
+
+    return _response(list_sounds(get_workspace(), case_id))
+
+
+@router.post("/cases/{case_id}/sounds")
+@endpoint
+def register_sound(case_id: str, body: SoundRegistration):
+    from app.services.targeted_search.sound_assets import register_sound as save_sound
+
+    workspace = get_workspace()
+    _asset_in_case(workspace, case_id, body.asset_id)
+    return _response(save_sound(workspace, **body.model_dump()))
+
+
+@router.post("/cases/{case_id}/acoustics/readiness")
+@endpoint
+def acoustic_readiness(case_id: str, body: AcousticOptions):
+    return _response(_acoustic_pipeline().readiness(case_id, body.model_dump()))
+
+
+@router.get("/cases/{case_id}/acoustics")
+@endpoint
+def acoustic_plans(case_id: str):
+    return _response(_acoustic_pipeline().list_plans(case_id))
+
+
+@router.post("/cases/{case_id}/acoustics")
+@endpoint
+def analyze_acoustics(case_id: str, body: AcousticOptions):
+    result = _acoustic_pipeline().enqueue(case_id, body.model_dump())
+    _start_worker()
+    return _response(result)
+
+
+@router.get("/cases/{case_id}/acoustics/{plan_id}")
+@endpoint
+def acoustic_plan(case_id: str, plan_id: str):
+    return _response(_acoustic_pipeline().get_plan(case_id, plan_id))
+
+
+@router.put("/cases/{case_id}/acoustics/{plan_id}")
+@endpoint
+def edit_acoustic_plan(case_id: str, plan_id: str, body: AcousticRevisionBody):
+    return _response(_acoustic_pipeline().save_plan(
+        case_id, plan_id, body.record.model_dump(), expected_revision=body.expected_revision,
+    ))
+
+
+@router.post("/cases/{case_id}/acoustics/{plan_id}/mix")
+@endpoint
+def mix_acoustics(case_id: str, plan_id: str, body: AcousticMixBody):
+    result = _acoustic_pipeline().enqueue_mix(
+        case_id, plan_id, expected_revision=body.expected_revision,
+    )
+    _start_worker()
+    return _response(result)
+
+
+@router.get("/cases/{case_id}/acoustics/{plan_id}/files/{artifact_id}")
+@endpoint
+def acoustic_content(case_id: str, plan_id: str, artifact_id: str):
+    path = _acoustic_pipeline().mix_content(case_id, plan_id, artifact_id)
+    return FileResponse(path, filename=path.name)
+
+
+def _documentary_writer():
+    from app.services.targeted_search.documentary import DocumentaryWriter
+
+    return DocumentaryWriter(get_workspace())
+
+
+@router.post("/cases/{case_id}/documentaries/evidence")
+@endpoint
+def documentary_evidence(case_id: str, body: DocumentaryEvidenceBody):
+    return _response(_documentary_writer().build_packet(case_id, body.claim_ids or None))
+
+
+@router.get("/cases/{case_id}/documentaries")
+@endpoint
+def documentaries(case_id: str):
+    return _response(_documentary_writer().list_documents(case_id))
+
+
+@router.post("/cases/{case_id}/documentaries")
+@endpoint
+def write_documentary(case_id: str, body: DocumentaryOptions):
+    result = _documentary_writer().enqueue(case_id, body.model_dump())
+    _start_worker()
+    return _response(result)
+
+
+@router.get("/cases/{case_id}/documentaries/{document_id}")
+@endpoint
+def documentary(case_id: str, document_id: str):
+    return _response(_documentary_writer().get_document(case_id, document_id))
+
+
+@router.put("/cases/{case_id}/documentaries/{document_id}")
+@endpoint
+def revise_documentary(case_id: str, document_id: str, body: DocumentaryRevisionBody):
+    return _response(
+        _documentary_writer().save_revision(
+            case_id, document_id, body.draft, expected_revision=body.expected_revision
+        )
+    )
+
+
+@router.post("/cases/{case_id}/documentaries/{document_id}/review")
+@endpoint
+def review_documentary(case_id: str, document_id: str, body: DocumentaryReviewBody):
+    return _response(
+        _documentary_writer().review(case_id, document_id, **body.model_dump())
+    )
+
+
+@router.post("/cases/{case_id}/documentaries/{document_id}/export")
+@endpoint
+def export_documentary(case_id: str, document_id: str, body: DocumentaryExportBody):
+    return _response(
+        _documentary_writer().export(case_id, document_id, **body.model_dump())
+    )
+
+
+@router.get("/cases/{case_id}/documentaries/{document_id}/files/{filename}")
+@endpoint
+def documentary_content(
+    case_id: str,
+    document_id: str,
+    filename: str,
+    expected_revision: int,
+    final: bool = False,
+):
+    path = _documentary_writer().export_content(
+        case_id,
+        document_id,
+        filename,
+        final=final,
+        expected_revision=expected_revision,
+    )
+    return FileResponse(path, filename=filename)
 
 
 @router.get("/cases/{case_id}/storyboards")

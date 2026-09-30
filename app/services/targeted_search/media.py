@@ -155,7 +155,7 @@ def promote_artifact(repo: Any, staged_path: Path, **record: Any) -> dict:
     staged_path = Path(staged_path)
     digest = sha256_file(staged_path)
     suffix = staged_path.suffix.lower()
-    if suffix not in {".mp4", ".mkv", ".webm", ".mov", ".json", ".jpg", ".png", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".pdf", ".txt", ".md", ".geojson", ".webp"}:
+    if suffix not in {".mp4", ".mkv", ".webm", ".mov", ".json", ".jpg", ".png", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".pdf", ".txt", ".md", ".geojson", ".webp", ".otio"}:
         suffix = ".bin"
     target = Path(repo.root) / "artifacts" / digest[:2] / (digest + suffix)
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -845,6 +845,89 @@ class TestLiteLLMProvider(unittest.TestCase):
         self.assertEqual(captured["config"].max_output_tokens, 2048)
         self.assertTrue(captured["closed"])
 
+    def test_gemini_accepts_long_documentary_output_budget(self):
+        app_config = {
+            "llm_provider": "gemini",
+            "gemini_api_key": "gemini-test-key",
+            "gemini_model_name": "gemini-test-model",
+        }
+        with patch("google.genai.Client") as client:
+            generation = (
+                client.return_value.__enter__.return_value.models.generate_content
+            )
+            generation.return_value = types.SimpleNamespace(
+                text="Long structured draft"
+            )
+            result = llm._generate_response(
+                "Write the documentary draft", app_config, max_output_tokens=16384
+            )
+
+        self.assertEqual(result, "Long structured draft")
+        self.assertEqual(generation.call_args.kwargs["config"].max_output_tokens, 16384)
+        client.return_value.__exit__.assert_called_once()
+
+    def test_gemini_explicit_none_preserves_default_output_budget(self):
+        app_config = {
+            "llm_provider": "gemini",
+            "gemini_api_key": "gemini-test-key",
+            "gemini_model_name": "gemini-test-model",
+        }
+        with patch("google.genai.Client") as client:
+            generation = (
+                client.return_value.__enter__.return_value.models.generate_content
+            )
+            generation.return_value = types.SimpleNamespace(text="Short draft")
+            result = llm._generate_response(
+                "Write a draft", app_config, max_output_tokens=None
+            )
+
+        self.assertEqual(result, "Short draft")
+        self.assertEqual(generation.call_args.kwargs["config"].max_output_tokens, 2048)
+
+    def test_invalid_output_budget_never_calls_provider(self):
+        app_config = {
+            "llm_provider": "gemini",
+            "gemini_api_key": "gemini-test-key",
+            "gemini_model_name": "gemini-test-model",
+        }
+        with patch("google.genai.Client") as client:
+            for value in (0, -1, True, 1.5, "16384"):
+                with self.subTest(max_output_tokens=value):
+                    result = llm._generate_response(
+                        "Write a draft", app_config, max_output_tokens=value
+                    )
+                    self.assertEqual(
+                        result, "Error: max_output_tokens must be a positive integer"
+                    )
+            client.assert_not_called()
+
+    def test_documentary_output_budget_leaves_other_provider_request_unchanged(self):
+        app_config = {
+            "llm_provider": "openai",
+            "openai_api_key": "openai-test-key",
+            "openai_model_name": "openai-test-model",
+        }
+        response = types.SimpleNamespace(
+            choices=[
+                types.SimpleNamespace(message=types.SimpleNamespace(content="Draft"))
+            ]
+        )
+        with (
+            patch.object(llm, "OpenAI") as client,
+            patch.object(llm, "ChatCompletion", types.SimpleNamespace),
+        ):
+            generation = client.return_value.chat.completions.create
+            generation.return_value = response
+            result = llm._generate_response(
+                "Write a draft", app_config, max_output_tokens=16384
+            )
+
+        self.assertEqual(result, "Draft")
+        generation.assert_called_once_with(
+            model="openai-test-model",
+            messages=[{"role": "user", "content": "Write a draft"}],
+        )
+
     def test_cloudflare_requires_account_id_before_request(self):
         """Cloudflare 缺少 Account ID 时应在本地失败，不发送无效请求。"""
         config.app.update(
