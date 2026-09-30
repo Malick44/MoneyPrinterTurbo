@@ -14,9 +14,14 @@ from app.models.documentary import (
 from app.models.search import SearchError
 from app.services.targeted_search import SearchService
 from app.services.targeted_search.case_workspace import CaseWorkspace, digest
-from app.services.targeted_search.documentary import DocumentaryWriter
+from app.services.targeted_search.documentary import (
+    DocumentaryWriter,
+    model_evidence_packet,
+)
 from app.services.targeted_search.documentary_agents import (
     MAX_BLUEPRINT_BYTES,
+    MAX_CONTINUITY_CHARACTERS,
+    MAX_PROMPT_CHARACTERS,
     CraftBlueprint,
     DocumentaryNarrationWriter,
     DocumentaryNarrativeReviewer,
@@ -254,6 +259,11 @@ def test_chapter_writer_uses_budgets_continuity_and_authoritative_service_valida
         == draft["chapters"][0]["scenes"][0]["passages"][0]["text"]
     )
     assert all(item[1]["craft_blueprint"] == blueprint for item in captured)
+    assert captured[1][1]["continuity_context"]["prior_scene_uses"] == []
+    assert (
+        captured[2][1]["continuity_context"]["prior_scene_uses"][0]["scene_id"]
+        == "scene_1"
+    )
     assert "only factual authority" in captured[1][0]
     assert "Never invent" in captured[1][0]
     assert "human approval" in captured[1][0]
@@ -562,6 +572,407 @@ def test_revision_feedback_requires_its_exact_previous_draft(craft_case, bluepri
             draft=draft,
             narrative_feedback=assessment,
         )
+
+
+def test_cumulative_continuity_retains_earlier_chapters_and_allows_evolving_callbacks(
+    craft_case, blueprint
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    third_outline = copy.deepcopy(outline["chapters"][1])
+    third_outline.update(chapter_id="chapter_3", title="A new consequence")
+    third_outline["scenes"][0]["scene_id"] = "scene_3"
+    outline["chapters"].append(third_outline)
+    draft["chapters"][0]["scenes"][0]["passages"][0]["text"] = (
+        "The first record question is answered. The record can now support a different question."
+    )
+    prompt = build_writer_prompt(
+        "draft",
+        evidence_packet=packet,
+        options={},
+        blueprint=blueprint,
+        outline=outline,
+        chapter_id="chapter_3",
+        preceding_chapters=draft["chapters"],
+    )
+    payload = _payload(prompt)
+    context = payload["continuity_context"]
+    assert [entry["scene_id"] for entry in context["prior_scene_uses"]] == [
+        "scene_1",
+        "scene_2",
+    ]
+    assert "first record question" in context["prior_scene_uses"][0]["speech_anchor"]
+    assert (
+        context["prior_scene_uses"][0]["claim_ids"]
+        == context["prior_scene_uses"][1]["claim_ids"]
+    )
+    assert context["developed_claim_ids"] == [packet["claims"][0]["id"]]
+    assert context["factual_authority"] == "evidence_packet_only"
+    assert context["all_completed_scene_ids_included"] is True
+    assert (
+        len(json.dumps(context, ensure_ascii=False, separators=(",", ":")))
+        <= MAX_CONTINUITY_CHARACTERS
+    )
+    assert (
+        payload["chapter_request"]["preceding_exit_narration"]
+        == draft["chapters"][1]["scenes"][0]["passages"][0]["text"]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation,match",
+    [
+        (
+            lambda chapter: chapter.update(chapter_id="different_chapter"),
+            "outline order",
+        ),
+        (
+            lambda chapter: chapter["scenes"][0].update(scene_id="different_scene"),
+            "scene order",
+        ),
+        (
+            lambda chapter: chapter["scenes"][0]["passages"][0].update(
+                claim_ids=["unknown_claim"]
+            ),
+            "evidence references",
+        ),
+        (
+            lambda chapter: chapter["scenes"][0]["passages"][0].update(
+                citation_ids=["unknown_citation"]
+            ),
+            "evidence references",
+        ),
+        (
+            lambda chapter: chapter["scenes"][0]["passages"][0]["claim_ids"].append(
+                chapter["scenes"][0]["passages"][0]["claim_ids"][0]
+            ),
+            "evidence references",
+        ),
+    ],
+)
+def test_continuity_rejects_wrong_order_or_unrelated_references(
+    craft_case, blueprint, mutation, match
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    completed = copy.deepcopy(draft["chapters"][:1])
+    mutation(completed[0])
+    with pytest.raises(SearchError, match=match):
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options={},
+            blueprint=blueprint,
+            outline=outline,
+            chapter_id="chapter_2",
+            preceding_chapters=completed,
+        )
+
+
+@pytest.mark.parametrize("defect", ["uncited_second_claim", "counterevidence_only"])
+def test_history_requires_each_claim_to_have_its_own_supporting_citation(
+    craft_case, blueprint, defect
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    packet = copy.deepcopy(packet)
+    completed = copy.deepcopy(draft["chapters"][:1])
+    passage = completed[0]["scenes"][0]["passages"][0]
+    if defect == "uncited_second_claim":
+        extra_citation = {**packet["citations"][0], "id": "dcite_other_claim_support"}
+        extra_claim = {
+            **packet["claims"][0],
+            "id": "claim_other",
+            "citation_ids": [extra_citation["id"]],
+        }
+        packet["citations"].append(extra_citation)
+        packet["claims"].append(extra_claim)
+        passage["claim_ids"].append(extra_claim["id"])
+    else:
+        packet["citations"][0]["relation"] = "contradicts"
+    with pytest.raises(SearchError, match="evidence references"):
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options={},
+            blueprint=blueprint,
+            outline=outline,
+            chapter_id="chapter_2",
+            preceding_chapters=completed,
+        )
+
+
+def test_continuity_compacts_optional_speech_anchors_without_losing_ids(
+    craft_case, blueprint
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    template_scene = copy.deepcopy(draft["chapters"][0]["scenes"][0])
+    template_outline = copy.deepcopy(outline["chapters"][0]["scenes"][0])
+    completed = copy.deepcopy(draft["chapters"][:1])
+    completed[0]["scenes"], outline["chapters"][0]["scenes"] = [], []
+    for number in range(30):
+        scene, planned = copy.deepcopy(template_scene), copy.deepcopy(template_outline)
+        scene["scene_id"] = planned["scene_id"] = f"prior_scene_{number}"
+        scene["passages"][0]["passage_id"] = f"prior_passage_{number}"
+        scene["passages"][0]["text"] = "A" * 197 + ". " + "B" * 197 + "."
+        completed[0]["scenes"].append(scene)
+        outline["chapters"][0]["scenes"].append(planned)
+    payload = _payload(
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options={},
+            blueprint=blueprint,
+            outline=outline,
+            chapter_id="chapter_2",
+            preceding_chapters=completed,
+        )
+    )
+    context = payload["continuity_context"]
+    assert [entry["scene_id"] for entry in context["prior_scene_uses"]] == [
+        f"prior_scene_{number}" for number in range(30)
+    ]
+    assert (
+        len(json.dumps(context, ensure_ascii=False, separators=(",", ":")))
+        <= MAX_CONTINUITY_CHARACTERS
+    )
+    assert any(
+        len(entry["speech_anchor"]) < 397 for entry in context["prior_scene_uses"]
+    )
+    assert all(
+        entry["claim_ids"] and entry["citation_ids"]
+        for entry in context["prior_scene_uses"]
+    )
+
+
+def test_oversized_essential_continuity_fails_instead_of_silently_omitting_scenes(
+    craft_case, blueprint
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    template_chapter, template_outline = (
+        copy.deepcopy(draft["chapters"][0]),
+        copy.deepcopy(outline["chapters"][0]),
+    )
+    completed, expanded = [], []
+    for chapter_number in range(3):
+        chapter, planned = (
+            copy.deepcopy(template_chapter),
+            copy.deepcopy(template_outline),
+        )
+        chapter["chapter_id"] = planned["chapter_id"] = f"long_chapter_{chapter_number}"
+        chapter["scenes"], planned["scenes"] = [], []
+        for scene_number in range(32):
+            suffix = f"{chapter_number}_{scene_number}_" + "x" * 100
+            scene, target = (
+                copy.deepcopy(template_chapter["scenes"][0]),
+                copy.deepcopy(template_outline["scenes"][0]),
+            )
+            scene["scene_id"] = target["scene_id"] = "scene_" + suffix
+            scene["passages"][0]["passage_id"] = "passage_" + suffix
+            chapter["scenes"].append(scene)
+            planned["scenes"].append(target)
+        completed.append(chapter)
+        expanded.append(planned)
+    expanded.append(outline["chapters"][1])
+    with pytest.raises(SearchError, match="Essential chapter continuity") as error:
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options={},
+            blueprint=blueprint,
+            outline={"chapters": expanded},
+            chapter_id="chapter_2",
+            preceding_chapters=completed,
+        )
+    assert error.value.status_code == 413
+
+
+@pytest.mark.parametrize("overflow", [0, 1, 100, 350])
+def test_whole_prompt_budget_shrinks_only_optional_continuity_anchors(
+    craft_case, blueprint, overflow
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    draft["chapters"][0]["scenes"][0]["passages"][0]["text"] = (
+        "A" * 197 + ". " + "B" * 197 + "."
+    )
+    assessment = DocumentaryNarrativeReviewer(
+        blueprint, lambda prompt, model: _review(draft)
+    ).review(draft)
+    context = {
+        "evidence_packet": packet,
+        "blueprint": blueprint,
+        "outline": outline,
+        "draft": draft,
+        "chapter_id": "chapter_2",
+        "preceding_chapters": draft["chapters"][:1],
+        "narrative_feedback": assessment,
+    }
+    base_prompt = build_writer_prompt("draft", options={"instructions": ""}, **context)
+    base_payload = _payload(base_prompt)
+    filler = "x" * (MAX_PROMPT_CHARACTERS - len(base_prompt) + overflow)
+    prompt = build_writer_prompt("draft", options={"instructions": filler}, **context)
+    payload = _payload(prompt)
+    assert len(prompt) <= MAX_PROMPT_CHARACTERS
+    assert payload["options"]["instructions"] == filler
+    assert payload["evidence_packet"] == base_payload["evidence_packet"]
+    assert payload["narrative_feedback"] == base_payload["narrative_feedback"]
+    assert payload["chapter_request"] == base_payload["chapter_request"]
+    assert payload["draft"] == base_payload["draft"]
+    expected_history = copy.deepcopy(base_payload["continuity_context"])
+    for entry in expected_history["prior_scene_uses"]:
+        entry["speech_anchor"] = payload["continuity_context"]["prior_scene_uses"][0][
+            "speech_anchor"
+        ]
+    assert payload["continuity_context"] == expected_history
+    if overflow:
+        assert len(
+            payload["continuity_context"]["prior_scene_uses"][0]["speech_anchor"]
+        ) < len(
+            base_payload["continuity_context"]["prior_scene_uses"][0]["speech_anchor"]
+        )
+    else:
+        assert len(prompt) == MAX_PROMPT_CHARACTERS
+
+
+def test_whole_prompt_budget_rejects_when_essential_history_cannot_fit(
+    craft_case, blueprint
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    draft["chapters"][0]["scenes"][0]["passages"][0]["text"] = (
+        "A" * 197 + ". " + "B" * 197 + "."
+    )
+    context = {
+        "evidence_packet": packet,
+        "blueprint": blueprint,
+        "outline": outline,
+        "chapter_id": "chapter_2",
+        "preceding_chapters": draft["chapters"][:1],
+    }
+    base_prompt = build_writer_prompt("draft", options={"instructions": ""}, **context)
+    history = _payload(base_prompt)["continuity_context"]
+    anchors = sum(len(entry["speech_anchor"]) for entry in history["prior_scene_uses"])
+    filler = "x" * (MAX_PROMPT_CHARACTERS - len(base_prompt) + anchors + 1)
+    with pytest.raises(SearchError, match="Essential chapter continuity") as error:
+        build_writer_prompt("draft", options={"instructions": filler}, **context)
+    assert error.value.status_code == 413
+
+
+def test_chapter_feedback_projects_after_full_validation_and_keeps_current_findings(
+    craft_case, blueprint
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    report = _review(draft)
+    issue = {
+        "category": "clarity",
+        "severity": "minor",
+        "passage_ids": ["passage_1"],
+        "reason": "A" * 1800,
+        "suggested_change": "B" * 1800,
+    }
+    report["scene_reviews"][0]["passage_reviews"][0]["issues"] = [
+        copy.deepcopy(issue) for _ in range(9)
+    ]
+    issue["passage_ids"] = ["passage_2"]
+    report["scene_reviews"][1]["passage_reviews"][0]["issues"] = [issue]
+    report["notes"] = ["Preserve all necessary local qualifications."]
+    assessment = DocumentaryNarrativeReviewer(
+        blueprint, lambda prompt, model: report
+    ).review(draft)
+    options = {"instructions": "x" * 185000}
+    with pytest.raises(SearchError, match="bounded context budget"):
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options=options,
+            blueprint=blueprint,
+            outline=outline,
+            draft=draft,
+            narrative_feedback=assessment,
+        )
+    prompt = build_writer_prompt(
+        "draft",
+        evidence_packet=packet,
+        options=options,
+        blueprint=blueprint,
+        outline=outline,
+        draft=draft,
+        chapter_id="chapter_2",
+        preceding_chapters=draft["chapters"][:1],
+        narrative_feedback=assessment,
+    )
+    payload = _payload(prompt)
+    projection = payload["narrative_feedback"]
+    assert len(prompt) <= 220000
+    assert projection["projection_kind"] == "chapter_scoped_narrative_feedback"
+    assert projection["full_assessment_validated"] is True
+    assert projection["full_assessment_hash"] == digest(assessment.model_dump())
+    assert projection["included_scene_ids"] == ["scene_2"]
+    assert projection["omitted_scene_ids"] == ["scene_1"]
+    assert projection["scene_reviews"] == [assessment.model_dump()["scene_reviews"][1]]
+    assert projection["notes"] == report["notes"]
+    assert projection["draft_hash"] == assessment.draft_hash
+    assert projection["blueprint_hash"] == assessment.blueprint_hash
+    assert projection["human_approved"] is False
+    assert len(assessment.scene_reviews) == 2
+    assert payload["evidence_packet"] == model_evidence_packet(packet)
+
+
+@pytest.mark.parametrize("defect", ["stale_other_chapter", "missing_other_chapter"])
+def test_chapter_projection_never_hides_invalid_full_feedback(
+    craft_case, blueprint, defect
+):
+    _, _, _, _, packet, outline, draft = craft_case
+    assessment = (
+        DocumentaryNarrativeReviewer(blueprint, lambda prompt, model: _review(draft))
+        .review(draft)
+        .model_dump()
+    )
+    if defect == "stale_other_chapter":
+        draft["chapters"][0]["scenes"][0]["passages"][0]["text"] += (
+            " Changed elsewhere."
+        )
+        match = "stale"
+    else:
+        assessment["scene_reviews"].pop(0)
+        match = "every current scene"
+    with pytest.raises(SearchError, match=match):
+        build_writer_prompt(
+            "draft",
+            evidence_packet=packet,
+            options={},
+            blueprint=blueprint,
+            outline=outline,
+            draft=draft,
+            chapter_id="chapter_2",
+            preceding_chapters=draft["chapters"][:1],
+            narrative_feedback=assessment,
+        )
+
+
+def test_optional_minor_note_can_remain_effective_but_material_minor_revision_cannot(
+    craft_case, blueprint
+):
+    *_, draft = craft_case
+    report = _review(draft)
+    passage = report["scene_reviews"][0]["passage_reviews"][0]
+    passage["issues"] = [
+        {
+            "category": "transition",
+            "severity": "minor",
+            "passage_ids": ["passage_1"],
+            "reason": "An alternative connective is a wording preference.",
+            "suggested_change": "Optionally choose a shorter connective.",
+        }
+    ]
+    reviewer = DocumentaryNarrativeReviewer(blueprint, lambda prompt, model: report)
+    assert reviewer.review(draft).verdict == "ready_for_editorial_review"
+    passage["issues"][0].update(
+        category="attribution",
+        reason="The qualifier comes after an unsupported causal impression.",
+        suggested_change="Put the necessary limit at its first relevant connection.",
+    )
+    passage["verdict"] = "revise"
+    with pytest.raises(SearchError, match="unresolved revision findings"):
+        reviewer.review(draft)
+    report["verdict"] = "revise"
+    assert reviewer.review(draft).verdict == "revise"
 
 
 def test_major_issue_requires_revision_verdict(craft_case, blueprint):

@@ -32,6 +32,7 @@ from .documentary import (
 from .repository import json_text
 
 MAX_PROMPT_CHARACTERS = 220000
+MAX_CONTINUITY_CHARACTERS = 12000
 MAX_BLUEPRINT_BYTES = 32000
 MAX_RESPONSE_CHARACTERS = 500000
 CraftRule = Annotated[str, Field(min_length=1, max_length=1200)]
@@ -210,10 +211,25 @@ quotes require quote records and exact indexed source text; preserve citation ma
 Preserve the supplied chapter/scene IDs and their order. Missing evidence and unacquired
 footage remain explicit in production fields, without repetitive spoken disclaimers.
 Use short concrete speech, varying sentence rhythm, purposeful scene exits and transitions
-that connect evidence to the next question. Do not repeat earlier passages or add filler.
+that connect evidence to the next question. Explain a necessary distinction once beside
+the evidence it qualifies, apply it to the case, and develop a supported new observation,
+decision or consequence. Do not repeatedly define the same distinction within a scene or
+across chapters. Preserve material local qualifications even when earlier scenes explained
+the general rule. A deliberate callback may reuse an object or fact when its evidentiary
+role changes or it resolves the governing question; repeating a premise is not development.
+Use continuity_context to see what prior scenes have already developed, not as evidence.
+Its selected speech anchors are incomplete generated narration. The evidence packet alone
+supports factual assertions. Do not add filler to meet a chapter budget.
 Do not narrate writing instructions, review checks or comments about where a qualification
 belongs. Express necessary attribution and limits directly for the viewer; reserve process
 instructions and acquisition notes for the separate production fields.
+Scope evidence gaps to specific unavailable records or media. Distinguish retained source
+excerpts, acquired documents, authenticated original/exhibit images, playback-reviewed
+footage and publication rights. Text support does not establish possession or clearance
+of the original exhibit or recording. Use explicitly supplied inventory or feedback without
+blanket-labeling every document or proposed asset unacquired, and state availability as
+unknown when the supplied context cannot establish it. Do not infer production inventory
+or public-use rights from the compact evidence packet alone.
 Follow the 22–28 minute spoken-word planning band and the supplied chapter budget where
 evidence permits. A duration target never authorizes fabrication or padding. Actual runtime
 requires recorded narration and editing. Audiovisual tactics are suggestions only and do
@@ -261,6 +277,122 @@ def _chapter_targets(outline, guidance, supplied=None):
         targets[chapter["chapter_id"]] = target
         remaining -= target
     return targets
+
+
+def _speech_anchor(scene, budget):
+    """Selected whole sentences are continuity cues, never source evidence."""
+    text = " ".join(
+        clean_narration_text(passage["text"]) for passage in scene["passages"]
+    )
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    selected = []
+    for sentence in (sentences[0], sentences[-1]):
+        if sentence not in selected and len(" ".join([*selected, sentence])) <= budget:
+            selected.append(sentence)
+    return " ".join(selected)
+
+
+def _continuity_context(completed, packet, *, max_characters=MAX_CONTINUITY_CHARACTERS):
+    """Keep all history IDs and shrink optional anchors before enforcing the cap."""
+    claims = {claim["id"]: set(claim["citation_ids"]) for claim in packet["claims"]}
+    citations = {citation["id"] for citation in packet["citations"]}
+    supports = {
+        citation["id"]
+        for citation in packet["citations"]
+        if citation["relation"] == "supports"
+    }
+    prior_scenes, developed = [], set()
+    history = _draft({"chapters": completed}) if completed else {"chapters": []}
+    source_scenes = []
+    for chapter in history["chapters"]:
+        for scene in chapter["scenes"]:
+            scene_claims, scene_citations = set(), set()
+            for passage in scene["passages"]:
+                claim_ids, citation_ids = passage["claim_ids"], passage["citation_ids"]
+                if (
+                    len(claim_ids) != len(set(claim_ids))
+                    or len(citation_ids) != len(set(citation_ids))
+                    or not set(claim_ids) <= claims.keys()
+                    or not set(citation_ids) <= citations
+                    or not set(citation_ids)
+                    <= set().union(*(claims[identifier] for identifier in claim_ids))
+                    or any(
+                        not set(citation_ids).intersection(claims[identifier], supports)
+                        for identifier in claim_ids
+                    )
+                ):
+                    raise SearchError(
+                        "Chapter continuity contains unrelated or duplicate evidence references.",
+                        422,
+                    )
+                scene_claims.update(claim_ids)
+                scene_citations.update(citation_ids)
+            developed.update(scene_claims)
+            prior_scenes.append(
+                {
+                    "chapter_id": chapter["chapter_id"],
+                    "scene_id": scene["scene_id"],
+                    "passage_ids": [
+                        passage["passage_id"] for passage in scene["passages"]
+                    ],
+                    "claim_ids": sorted(scene_claims),
+                    "citation_ids": sorted(scene_citations),
+                    "speech_anchor": "",
+                }
+            )
+            source_scenes.append(scene)
+    context = {
+        "kind": "generated_narration_history",
+        "factual_authority": "evidence_packet_only",
+        "anchor_scope": "selected sentences, not complete prior narration or primary evidence",
+        "all_completed_scene_ids_included": True,
+        "developed_claim_ids": sorted(developed),
+        "prior_scene_uses": prior_scenes,
+    }
+    context_budget = min(MAX_CONTINUITY_CHARACTERS, max_characters)
+    if len(json_text(context)) > context_budget:
+        raise SearchError(
+            "Essential chapter continuity exceeds its bounded context budget.", 413
+        )
+    for anchor_budget in (400, 240, 120, 0):
+        for entry, scene in zip(prior_scenes, source_scenes):
+            entry["speech_anchor"] = (
+                _speech_anchor(scene, anchor_budget) if anchor_budget else ""
+            )
+        if len(json_text(context)) <= context_budget:
+            return context
+    raise SearchError("Chapter continuity exceeds its bounded context budget.", 413)
+
+
+def _chapter_feedback(feedback, chapter):
+    """Project only after the full exact-draft assessment has been validated."""
+    scene_ids = [scene["scene_id"] for scene in chapter["scenes"]]
+    included = set(scene_ids)
+    reviews = {scene["scene_id"]: scene for scene in feedback["scene_reviews"]}
+    if not included <= reviews.keys():
+        raise SearchError(
+            "Chapter feedback must refer to scenes in the reviewed draft.", 422
+        )
+    return {
+        "projection_kind": "chapter_scoped_narrative_feedback",
+        "full_assessment_hash": digest(feedback),
+        "full_assessment_validated": True,
+        "draft_hash": feedback["draft_hash"],
+        "blueprint_hash": feedback["blueprint_hash"],
+        "review_kind": feedback["review_kind"],
+        "human_approved": False,
+        "overall_score": feedback["overall_score"],
+        "verdict": feedback["verdict"],
+        "notes": feedback["notes"],
+        "chapter_id": chapter["chapter_id"],
+        "included_scene_ids": scene_ids,
+        "omitted_scene_ids": [
+            scene["scene_id"]
+            for scene in feedback["scene_reviews"]
+            if scene["scene_id"] not in included
+        ],
+        "scene_reviews": [reviews[identifier] for identifier in scene_ids],
+    }
 
 
 def build_writer_prompt(
@@ -346,6 +478,19 @@ def build_writer_prompt(
                 "Chapter continuity must contain all preceding chapters in outline order.",
                 422,
             )
+        if any(
+            [scene["scene_id"] for scene in chapter["scenes"]]
+            != [scene["scene_id"] for scene in expected["scenes"]]
+            for chapter, expected in zip(completed, chapters[:chapter_index])
+        ):
+            raise SearchError(
+                "Chapter continuity must preserve preceding outline scene order.", 422
+            )
+        payload["continuity_context"] = _continuity_context(
+            completed, payload["evidence_packet"]
+        )
+        if feedback is not None:
+            payload["narrative_feedback"] = _chapter_feedback(feedback, matching[0])
         targets = _chapter_targets(value, guidance, chapter_word_targets)
         exit_text = ""
         if completed:
@@ -371,7 +516,21 @@ def build_writer_prompt(
     payload["output_schema"] = output_type.model_json_schema()
     instructions = _WRITER_RULES
     if chapter_id is not None:
-        instructions += " Return only chapter_request.chapter_outline as a complete narration chapter. The full outline supplies continuity, not permission to generate other chapters. Count only spoken passage text, excluding headings, citation markers and production notes."
+        instructions += " Return only chapter_request.chapter_outline as a complete narration chapter. The full outline supplies continuity, not permission to generate other chapters. Chapter-scoped narrative feedback is an explicitly partial projection of a separately validated full assessment; apply its current-scene findings and relevant global notes without rewriting omitted chapters. Count only spoken passage text, excluding headings, citation markers and production notes."
+        context_characters = len(json_text(payload["continuity_context"]))
+        fixed_characters = (
+            len(" ".join(instructions.split()))
+            + 1
+            + len(json_text(payload))
+            - context_characters
+        )
+        remaining = MAX_PROMPT_CHARACTERS - fixed_characters
+        if context_characters > remaining:
+            payload["continuity_context"] = _continuity_context(
+                completed,
+                payload["evidence_packet"],
+                max_characters=remaining,
+            )
     return _prompt(instructions, payload)
 
 
@@ -561,6 +720,20 @@ Flag manufactured suspicion, repetitive qualifications, invented private thought
 or unsupported implications as craft problems requiring the separate factual reviewer;
 you cannot establish factual support from narration alone. Do not propose new case facts,
 new quote text, fabricated sensory details or removal of necessary local attribution.
+Keep optional cosmetic preferences as minor notes on an effective passage. Reserve a
+passage verdict of revise for a concrete comprehension failure, substantial redundant
+explanation, broken governing promise, material causal/attribution problem or production
+contradiction. A minor label does not make a material problem optional: explain its viewer
+impact and require revision when necessary. Prioritize the most consequential ID-linked
+changes in notes without hiding other genuine findings or forcing whole-script rewriting.
+Allow deliberate evolving-object callbacks and a concise final payoff; identify exactly
+where a repeated distinction adds no new understanding. Preserve necessary local limits.
+Review spoken text together with footage queries and evidence gaps. Scope availability
+findings to the specific original record or media. Distinguish retained excerpt support,
+acquired documents, authenticated original/exhibit images, playback-reviewed footage and
+publication rights. Explicit inventory or feedback can establish availability; the compact
+source context alone cannot. Do not blanket-stamp every document unacquired or infer
+production possession, clearance or rights from a source excerpt.
 Tension should come from evidence questions the retained record can answer, rather than
 withholding material counterevidence or insinuating guilt through atmosphere. Preserve
 stable scene and passage IDs. Scene issues may reference only passages in that scene;

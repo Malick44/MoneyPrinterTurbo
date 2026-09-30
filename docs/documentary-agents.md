@@ -99,10 +99,28 @@ record = writer.generate(
 For `outline`, the callback receives `DocumentaryOutline`. A whole-draft call
 receives `DocumentaryDraft`. With `chapter_by_chapter=True`, each draft call
 receives `DocumentaryChapter`. The hook requests chapters in outline order,
-includes the preceding chapter's final passage for continuity, checks stable
-chapter and scene IDs, and assembles the complete draft. The existing writer
+includes cumulative scene/claim continuity and the preceding chapter's final
+passage, checks stable chapter and scene IDs, and assembles the complete draft. The existing writer
 then validates every claim, citation, exact quote and source snapshot before
 saving it. No partial chapter is automatically persisted.
+
+The cumulative `continuity_context` contains all completed scene and passage
+IDs, their prior claim/citation uses, and selected actual-speech anchors. It is
+bounded to 12,000 characters and the space remaining within the complete
+220,000-character prompt. Optional speech anchors shrink before any IDs are
+lost. The calculation includes the output schema, instructions, evidence and
+chapter feedback. If essential history cannot fit, the call fails explicitly;
+it never trims evidence, current-scene findings or history IDs to fit.
+Preceding chapters must preserve outline order and scene IDs. Their reference
+IDs must belong to the current packet, and each referenced claim needs a
+supporting citation in its passage. Generated history is a writing aid, not
+source evidence or a substitute for the writer's final validation.
+
+The writer should explain a necessary distinction once at its relevant
+connection, apply it, and develop a new supported observation, decision or
+consequence. Material attribution and uncertainty remain local. A callback
+may reuse an earlier fact or object when its evidentiary role changes or it
+closes the governing question; repeated claim IDs are allowed.
 
 By default, chapters share the target word budget in proportion to their scene
 counts. Override that with `chapter_word_targets={chapter_id: word_count, ...}`
@@ -153,6 +171,12 @@ promise/payoff closure and causal implications created by adjacent passages.
 Unknown IDs, duplicate IDs, missing
 coverage and references to another scene's passages are rejected. A major issue
 or a passage requiring revision must produce the overall verdict `revise`.
+Optional cosmetic preferences may remain minor notes on an `effective`
+passage. A minor label does not make a material comprehension, source,
+causality or production problem optional: those findings still require a
+passage and overall revision verdict. The reviewer prioritizes consequential
+changes without suppressing other findings or automatically granting readiness
+from a score or an all-minor issue list.
 
 The helper attaches protected `draft_hash`, `blueprint_hash`,
 `review_kind="model_narrative_assessment"` and `human_approved=false`, returning
@@ -167,6 +191,26 @@ feedback hashes are checked before prompting. The revised narration remains
 subject to the evidence and stable-structure checks. Generating or saving it
 clears the existing factual assessment and human approval. Run a new narrative
 assessment and the independent factual review after the change.
+
+Chapter calls first validate the complete assessment against the complete
+previous draft and blueprint, including all coverage and hashes. They then
+send a clearly labeled `chapter_scoped_narrative_feedback` projection containing
+every current-chapter scene/passages finding, all global notes and the protected
+review provenance. Included and omitted scene IDs make the scope explicit;
+`full_assessment_hash` identifies the validated complete report. The full
+assessment remains unchanged. A stale or incomplete report from another
+chapter is rejected before projection. This keeps unrelated chapter reviews
+out of each prompt without dropping authoritative evidence. The complete
+220,000-character prompt cap still applies and never silently truncates the
+evidence packet or a required current-chapter finding.
+
+Availability notes should identify the specific missing record or media.
+Retained source text, an acquired PDF, an authenticated original exhibit image,
+playback-reviewed footage and publication rights are different states. Explicit
+inventory or feedback can establish which document is available. The compact
+source packet alone cannot establish production inventory or public-use rights;
+avoid blanket missing-asset notes and mark unresolved status honestly. Reviewers
+check both narration and production gaps/queries for such conflicts.
 
 Craft reports are private advisory artifacts, not database workflow states.
 The reviewer does not persist or approve the document. When orchestrating it
