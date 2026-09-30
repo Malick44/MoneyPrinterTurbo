@@ -65,6 +65,7 @@ from app.services import task as tm
 from app.services import version_checker
 from app.utils.logging_utils import configure_terminal_logger
 from app.utils import utils
+from webui import targeted_search as targeted_search_ui
 
 st.set_page_config(
     page_title="MoneyPrinterTurbo",
@@ -250,6 +251,7 @@ KEY_BACKUP_FILE_NAME = "moneyprinterturbo-keys.json"
 PRESET_EXCLUDED_PARAM_KEYS = frozenset(
     {
         "video_materials",
+        "search_artifact_ids",
         "custom_audio_file",
         "bgm_file",
     }
@@ -801,7 +803,7 @@ def _build_restore_upload_requirements(params: Mapping) -> dict:
     素材和自定义音频依赖，并在用户重新生成前检查是否已经主动补充或替换。
     """
     return {
-        "local_materials": params.get("video_source") == "local"
+        "local_materials": (params.get("video_source") == "local" and not params.get("search_artifact_ids"))
         or (params.get("video_source") == "builtin" and bool(params.get("video_materials"))),
         "custom_audio": bool(params.get("custom_audio_file")),
         "original_voice_name": params.get("voice_name") or "",
@@ -1577,6 +1579,7 @@ def _apply_restored_params(params):
     # 历史任务只保存素材路径，不能保证这些文件在当前环境仍然存在。
     # 同时清空当前页面已缓存的上传素材，避免恢复后误用另一个任务的文件。
     st.session_state["local_video_materials"] = []
+    targeted_search_ui.restore_artifact_selection(params)
     st.session_state.pop("custom_audio_file_uploader", None)
     st.session_state.pop("custom_bgm_uploader", None)
     st.session_state.pop("custom_bgm_validation", None)
@@ -5195,6 +5198,8 @@ def _render_video_settings(panel, params):
                         else "local_video_materials_uploader"
                     ),
                 )
+                if params.video_source == "local":
+                    targeted_search_ui.render_search_button(tr, params)
 
             # 文案顺序匹配会从关键词生成到最终合成全程保持叙事顺序，因此开启时
             # 顺序拼接是唯一符合实际执行逻辑的选项。同步控件值可避免界面仍显示
@@ -7471,6 +7476,10 @@ def _render_generation_controls(
         "task_restore_upload_requirements", {}
     )
     saved_local_materials = st.session_state.get("local_video_materials", [])
+    params.search_artifact_ids = (
+        targeted_search_ui.selected_artifact_ids()
+        if params.video_source == "local" else []
+    )
     if params.video_source == "builtin":
         saved_local_materials = [
             item for item in saved_local_materials
@@ -7478,7 +7487,7 @@ def _render_generation_controls(
             and os.path.splitext(item.get("url", ""))[1].lower()
             in BUILTIN_SCREENSHOT_EXTENSIONS
         ]
-    has_local_materials = bool(uploaded_files or saved_local_materials)
+    has_local_materials = bool(uploaded_files or saved_local_materials or params.search_artifact_ids)
     has_custom_audio = bool(uploaded_audio_file)
     unmet_restore_requirements = _get_unmet_restore_upload_requirements(
         restore_upload_requirements,

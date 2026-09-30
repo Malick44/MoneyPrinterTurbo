@@ -1,0 +1,1213 @@
+{
+  "schema_version": "1.0",
+  "description": "50 manually authored exact/paraphrase queries on owned synthetic text, with measured fixture ranges and deliberate hard negatives. A smoke evaluation, not a production-domain accuracy claim.",
+  "fixtures": [
+    {
+      "url": "local://gold_fractions",
+      "metadata": {
+        "title": "Owned lesson fractions",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "We subtract fractions with unlike denominators by finding the least common multiple. Convert both numerators to equivalent fractions, subtract the scaled numerators and simplify the result."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_oil",
+      "metadata": {
+        "title": "Owned lesson oil",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "Drilling crews extract petroleum from the Bakken formation beneath North Dakota. A pumpjack lifts crude oil, and truck drivers carry equipment between remote well pads."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_court",
+      "metadata": {
+        "title": "Owned lesson court",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "Inside the courtroom the prosecutor presents evidence and the defense questions witnesses. The jury returns a verdict after deliberations. The judge announces the sentence at a separate hearing."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_baking",
+      "metadata": {
+        "title": "Owned lesson baking",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "Bake bread by mixing flour, water, yeast and salt. Knead the dough until elastic, let it rise, shape a loaf and place it in a hot oven until the crust is golden."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_rescue",
+      "metadata": {
+        "title": "Owned lesson rescue",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "Rescuers put on life jackets and launch a boat to reach people stranded by floodwater. Emergency teams evacuate residents to higher ground and check every house for trapped occupants."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_mention",
+      "metadata": {
+        "title": "Owned personal diary",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "I once heard a story about North Dakota drilling. Anyway this episode is about our sourdough baking business and selling loaves at a farmers market."
+          }
+        ]
+      }
+    },
+    {
+      "url": "local://gold_numbers",
+      "metadata": {
+        "title": "Owned sports news",
+        "description": "",
+        "duration_ms": 30000,
+        "cues": [
+          {
+            "start_ms": 1000,
+            "end_ms": 15000,
+            "text": "The final score is a fraction of last seasons total. Players defend their title, and the coach judges the team performance at the stadium."
+          }
+        ]
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query": "subtract fractions",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "unlike denominators",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "least common multiple",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "equivalent fractions",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "scaled numerators",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "take one rational number away from another",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "make the bottoms of two ratios equal before taking their difference",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "calculate the difference of two parts of a whole",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "rewrite one half and one third over six",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "reduce the resulting ratio to lowest terms",
+      "relevant": [
+        {
+          "source_id": "local:gold_fractions",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "Bakken formation",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "North Dakota drilling",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "pumpjack crude oil",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "truck drivers equipment",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "remote well pads",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "workers boring deep holes to reach underground hydrocarbons",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "heavy vehicles delivering supplies to extraction sites",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "a mechanical beam raises liquid fuel from a well",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "petroleum production in the northern plains",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "industrial drilling operations in shale deposits",
+      "relevant": [
+        {
+          "source_id": "local:gold_oil",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "courtroom prosecutor",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "defense witnesses",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "jury verdict",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "judge sentence",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "deliberations hearing",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "lawyers questioning people under oath before jurors",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "a panel decides whether a defendant committed an offense",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "a judicial officer imposes a punishment",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "the final decision following a criminal trial",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "legal proceedings with evidence presented to a jury",
+      "relevant": [
+        {
+          "source_id": "local:gold_court",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "bake bread",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "flour water yeast salt",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "knead dough",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "shape loaf",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "golden crust",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "make a baked loaf with fermented dough",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "work the mixture until stretchy and allow it to expand",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "instructions for making homemade sourdough",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "heating risen wheat dough to form a crust",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "prepare a loaf using a leavening organism",
+      "relevant": [
+        {
+          "source_id": "local:gold_baking",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "life jackets",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "rescuers boat",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "stranded floodwater",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "higher ground",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "trapped occupants",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "saving people from homes surrounded by rising water",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "moving families to safety after a river overflows",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "an emergency crew uses a vessel during an inundation",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "residents are relocated away from a flooded area",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    },
+    {
+      "query": "a water rescue operation protects stranded households",
+      "relevant": [
+        {
+          "source_id": "local:gold_rescue",
+          "start_ms": 1000,
+          "end_ms": 15000
+        }
+      ],
+      "minimum_iou": 0.5,
+      "filters": {
+        "source_ids": [
+          "local:gold_fractions",
+          "local:gold_oil",
+          "local:gold_court",
+          "local:gold_baking",
+          "local:gold_rescue",
+          "local:gold_mention",
+          "local:gold_numbers"
+        ]
+      }
+    }
+  ]
+}

@@ -77,6 +77,38 @@ tls_verify = true
 # or cloud relays) and renders it into a video clip.
 video_source = "pexels"
 
+# Caption-first targeted search. The source library starts with unknown rights;
+# ingestion fetches metadata/captions only. Approval is persisted in SQLite.
+targeted_search_enabled = true
+targeted_search_api_requests_per_minute = 120
+targeted_search_max_pending_jobs = 200
+targeted_search_storage_dir = "storage/targeted_search"
+targeted_search_allowed_domains = ["youtube.com", "youtu.be", "krem.com", "khq.com", "kxly.com", "nbcnews.com", "nbc.com", "oxygen.com", "peacocktv.com", "tegna.kurator.com", "spokesman.com"]
+targeted_search_caption_languages = ["en", "en-US"]
+targeted_search_max_source_duration_seconds = 14400
+targeted_search_max_download_bytes = 2147483648
+targeted_search_command_timeout_seconds = 900
+targeted_search_semantic_enabled = false
+targeted_search_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+targeted_search_reranker_enabled = false
+targeted_search_reranker_model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+targeted_search_visual_enabled = false
+targeted_search_ocr_enabled = false
+targeted_search_local_models_only = true
+# Enable visual search only after installing a local checkpoint.
+targeted_search_vision_checkpoint = ""
+targeted_search_asr_model = "small"
+targeted_search_max_clip_duration_ms = 90000
+targeted_search_max_storage_bytes = 20000000000
+
+# Case folders under owned search storage are accepted by default. Add only
+# explicit local directories when importing evidence from elsewhere.
+case_workspace_import_roots = []
+# Optional local WhisperX runtime/checkpoint for forced word alignment.
+# Word_Timestamps.json import works without installing WhisperX.
+targeted_search_whisperx_alignment_checkpoint = ""
+targeted_search_whisperx_language = "en"
+
 # API key lists support key rotation. Use straight ASCII double quotes and
 # separate multiple keys with commas, for example: ["key-1", "key-2"].
 # Key 必须使用英文半角双引号，多个 Key 使用英文逗号分隔。

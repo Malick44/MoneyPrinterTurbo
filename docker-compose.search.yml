@@ -1,0 +1,37 @@
+services:
+  search-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.search
+    user: "${SEARCH_WORKER_UID:-1000}:${SEARCH_WORKER_GID:-1000}"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2
+    mem_limit: 4g
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    volumes:
+      - ./storage:/app/storage
+      - ${SEARCH_WORKER_CONFIG:-./config.toml}:/app/config.toml:ro
+      - ${SEARCH_WORKER_MODELS:-./models}:/models:ro
+      # Existing owned-source records retain their validated host absolute path.
+      # Set SEARCH_HOST_STORAGE_PATH to the host's absolute storage directory
+      # to expose that same path read-only without mounting unrelated files.
+      - type: bind
+        source: ./storage
+        target: ${SEARCH_HOST_STORAGE_PATH:-/source-storage}
+        read_only: true
+    # Selected remote sources use the container's normal isolated outbound
+    # network. No listening port, host socket, privilege, or device is exposed.
+    command:
+      - python
+      - -m
+      - app.services.targeted_search.worker
+      - --root
+      - /app/storage/targeted_search

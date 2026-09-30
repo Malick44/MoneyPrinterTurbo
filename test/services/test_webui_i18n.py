@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.models.llm_provider import get_llm_provider
 from app.utils import utils
+from webui.targeted_search import TARGETED_SEARCH_TRANSLATION_KEYS
 
 
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -114,7 +115,7 @@ ENGLISH_FALLBACK_KEYS = frozenset(
         "Unavailable AI Video Model",
         "VoxCPM Speed Not Supported",
     }
-)
+) | TARGETED_SEARCH_TRANSLATION_KEYS
 FORMAT_PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
 MARKDOWN_URL_PATTERN = re.compile(r"\[[^\]]+\]\((https?://[^)]+)\)")
 

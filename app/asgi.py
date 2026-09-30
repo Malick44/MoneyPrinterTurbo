@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -41,9 +42,21 @@ async def application_lifespan(_: FastAPI):
     from app.services import task as task_service
 
     task_service.recover_interrupted_cross_posts()
+    search_worker = None
+    if config.app.get("targeted_search_enabled", True):
+        from app.services.targeted_search.settings import Settings
+        from app.services.targeted_search.worker import ensure_worker_running
+
+        search_settings = Settings.from_config()
+        if (search_settings.root_dir / "search.sqlite3").is_file():
+            search_worker = ensure_worker_running()
     try:
         yield
     finally:
+        if search_worker is not None:
+            from app.services.targeted_search.worker import stop_worker
+
+            stop_worker()
         logger.info("shutdown event")
 
 
@@ -58,7 +71,7 @@ def validation_exception_handler(request: Request, e: RequestValidationError):
     return JSONResponse(
         status_code=400,
         content=utils.get_response(
-            status=400, data=e.errors(), message="field required"
+            status=400, data=jsonable_encoder(e.errors(), custom_encoder={ValueError: str}), message="field required"
         ),
     )
 
@@ -181,6 +194,27 @@ def get_application() -> FastAPI:
     instance.include_router(root_api_router)
     instance.add_exception_handler(HttpException, exception_handler)
     instance.add_exception_handler(RequestValidationError, validation_exception_handler)
+    from app.services.targeted_search.rate_limit import RequestBudget
+
+    configured_limit = config.app.get("targeted_search_api_requests_per_minute", 120)
+    limit = configured_limit if isinstance(configured_limit, int) and not isinstance(configured_limit, bool) else 120
+    budget = RequestBudget(limit)
+
+    @instance.middleware("http")
+    async def budget_search_requests(request: Request, call_next):
+        path = request.url.path
+        search_request = any(path == prefix or path.startswith(prefix + "/") for prefix in ("/api/v1/search", "/api/v1/cases"))
+        if search_request and request.method != "OPTIONS":
+            try:
+                base.verify_token(request)
+            except HttpException as exc:
+                return exception_handler(request, exc)
+            client = request.client.host if request.client else "local"
+            if not budget.allow(client):
+                return JSONResponse(status_code=429, headers={"Retry-After": "60"},
+                                    content=utils.get_response(429, message="Targeted search request budget exceeded"))
+        return await call_next(request)
+
     return instance
 
 
@@ -201,8 +235,17 @@ async def protect_generated_task_files(request: Request, call_next):
     if is_task_file and request.method != "OPTIONS":
         try:
             base.verify_token(request)
+            segments = request_path.split("/")
+            if len(segments) > 2 and segments[2]:
+                from app.services.search_bridge import authorize_task_sources
+
+                authorize_task_sources(segments[2], "generated_export")
         except HttpException as exception:
             return exception_handler(request, exception)
+        except (ValueError, RuntimeError) as exception:
+            return JSONResponse(status_code=403, content=utils.get_response(
+                status=403, message=f"Source policy prevents delivery: {exception}",
+            ))
 
     return await call_next(request)
 

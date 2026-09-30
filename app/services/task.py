@@ -1146,6 +1146,9 @@ def _run_cross_post(
     """后台执行跨平台发布，并只补充发布相关的任务字段。"""
     results = []
     try:
+        from app.services.search_bridge import authorize_task_sources
+
+        authorize_task_sources(task_id, "publication")
         state_updated = _patch_cross_post_state(
             task_id,
             cross_post_state=const.CROSS_POST_STATE_PROCESSING,
@@ -1316,6 +1319,19 @@ def _schedule_cross_post(
     youtube_made_for_kids: bool = False,
 ) -> str | None:
     """提交后台发布任务；成功返回 None，调度失败返回可查询的错误原因。"""
+    try:
+        from app.services.search_bridge import authorize_task_sources
+
+        authorize_task_sources(task_id, "publication")
+    except (ValueError, RuntimeError) as exc:
+        error = f"Source policy prevents publication: {exc}"
+        _patch_cross_post_state(
+            task_id,
+            cross_post_state=const.CROSS_POST_STATE_FAILED,
+            cross_post_error=error,
+            cross_post_owner=None,
+        )
+        return error
     if not _cross_post_slots.acquire(blocking=False):
         error = "cross-post queue is full; publishing was skipped"
         logger.warning(
@@ -1371,6 +1387,16 @@ def _run_pipeline(
 ):
     logger.info(f"start task: {task_id}, stop_at: {stop_at}")
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=5)
+
+    if stop_at in {"materials", "video"} and (
+        params.video_source == "local" or getattr(params, "search_artifact_ids", [])
+    ):
+        try:
+            from app.services.search_bridge import prepare_search_materials
+
+            prepare_search_materials(params, task_id)
+        except (ValueError, RuntimeError) as exc:
+            return _mark_task_failed(task_id, "materials", str(exc))
 
     if (
         stop_at in {"materials", "video"}

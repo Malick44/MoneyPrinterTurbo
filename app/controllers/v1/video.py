@@ -459,6 +459,7 @@ async def stream_video(request: Request, file_path: str):
     request_id = base.get_task_id(request)
     tasks_dir = utils.task_dir()
     video_path = _resolve_path_within_directory(tasks_dir, file_path, request_id)
+    _authorize_search_delivery(tasks_dir, video_path, request_id)
     range_header = request.headers.get("Range")
     video_size = os.path.getsize(video_path)
     start, end = _parse_byte_range(range_header, video_size, request_id)
@@ -498,6 +499,7 @@ async def download_video(request: Request, file_path: str):
     request_id = base.get_task_id(request)
     tasks_dir = utils.task_dir()
     video_path = _resolve_path_within_directory(tasks_dir, file_path, request_id)
+    _authorize_search_delivery(tasks_dir, video_path, request_id)
     file_path = pathlib.Path(video_path)
     filename = file_path.name
     extension = file_path.suffix
@@ -506,3 +508,17 @@ async def download_video(request: Request, file_path: str):
         filename=filename,
         media_type=f"video/{extension[1:]}",
     )
+
+
+def _authorize_search_delivery(tasks_dir: str, video_path: str, request_id: str) -> None:
+    from app.services.search_bridge import authorize_task_sources
+
+    relative = pathlib.Path(video_path).resolve().relative_to(pathlib.Path(tasks_dir).resolve())
+    if len(relative.parts) < 2:
+        return  # Historical files at the task root have no per-task provenance.
+    task_id = relative.parts[0]
+    try:
+        authorize_task_sources(task_id, "generated_export")
+    except (ValueError, RuntimeError) as exc:
+        raise HttpException(task_id=request_id, status_code=403,
+                            message=f"Source policy prevents delivery: {exc}") from None

@@ -1,0 +1,33 @@
+# Optional isolated worker; the API/UI can continue running on the host.
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    PATH=/app/.venv/bin:$PATH \
+    UV_PYTHON_DOWNLOADS=never \
+    IMAGEIO_FFMPEG_EXE=/usr/bin/ffmpeg \
+    TARGETED_SEARCH_FFPROBE=/usr/bin/ffprobe \
+    HF_HOME=/models/huggingface \
+    TORCH_HOME=/models/torch \
+    TOKENIZERS_PARALLELISM=false \
+    OMP_NUM_THREADS=2 \
+    OMP_THREAD_LIMIT=2
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg tesseract-ocr ca-certificates libgomp1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir uv==0.8.23 \
+    && groupadd --gid 1000 searchworker \
+    && useradd --uid 1000 --gid 1000 --no-create-home --home-dir /tmp searchworker
+
+WORKDIR /app
+COPY pyproject.toml uv.lock README-en.md ./
+RUN uv sync --frozen --no-dev --extra targeted-search --extra search-semantic --extra search-visual --extra case-workspace
+COPY app ./app
+COPY config.example.toml ./config.toml
+RUN mkdir -p /app/storage/targeted_search /app/storage/local_videos /app/storage/tasks /models \
+    && chown -R searchworker:searchworker /app/storage /models
+
+USER searchworker
+CMD ["python", "-m", "app.services.targeted_search.worker", "--root", "/app/storage/targeted_search"]

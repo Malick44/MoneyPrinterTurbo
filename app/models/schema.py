@@ -95,6 +95,7 @@ class MaterialInfo:
     # 本地上传素材不需要填写；写入任务文件前仍会按字段白名单重新构造，
     # 避免外部请求传入的签名 URL、凭据或无关字段进入持久化数据。
     source_info: Optional[dict[str, Any]] = None
+    artifact_id: Optional[str] = None
 
 
 class ProductionIntelligenceSettings(BaseModel):
@@ -183,6 +184,7 @@ class VideoParams(ProductionIntelligenceSettings):
     video_materials: Optional[List[MaterialInfo]] = (
         None  # Materials used to generate the video
     )
+    search_artifact_ids: list[str] = Field(default_factory=list, max_length=100)
 
     custom_audio_file: Optional[str] = (
         None  # Custom audio file path, will ignore TTS and can still use Whisper subtitles

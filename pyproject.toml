@@ -38,6 +38,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+case-workspace = [
+    "pypdf>=6,<7",
+    "pypdfium2>=4.30,<6",
+]
+targeted-search = [
+    "yt-dlp[default]>=2025.10.22",
+]
+search-semantic = [
+    "sentence-transformers>=5.0.0",
+]
+search-visual = [
+    "open-clip-torch>=3.0.0",
+    "pytesseract>=0.3.13",
+    "scenedetect>=0.6.6",
+    "opencv-python>=4.11.0.86",
+]
 # Optional TwelveLabs (https://twelvelabs.io) video-understanding/embedding
 # integration. Only needed when `twelvelabs_api_keys` is configured; install
 # with `uv sync --extra twelvelabs`.

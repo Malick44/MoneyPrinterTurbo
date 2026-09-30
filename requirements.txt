@@ -1,4 +1,7 @@
 # Keep legacy pip install support; primary deps moved to pyproject.toml / uv.lock.
+# Optional targeted search: uv sync --extra targeted-search
+# Add --extra search-semantic --extra search-visual for local model retrieval.
+# Add --extra case-workspace for PDF text extraction and page previews.
 moviepy==2.2.1
 streamlit==1.59.1
 streamlit-tour==1.1.0
