@@ -74,7 +74,7 @@ RECOMMENDED_LLM_PROVIDERS = {
 # logged-in ``claude`` CLI. Keep this set aligned with the
 # ``requires_api_key=False`` entries of ``app/models/llm_provider.py``; asking
 # the user for a key that the provider never reads leaves the Skill stuck.
-KEYLESS_LLM_PROVIDERS = {"ollama", "litellm", "claude_code"}
+KEYLESS_LLM_PROVIDERS = {"ollama", "litellm", "claude_code", "codex"}
 CUSTOM_OPENAI_PROVIDER = "oneapi"
 
 # Hidden providers such as Qwen, Azure, and Grok remain usable when already
